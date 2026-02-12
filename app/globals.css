@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root, .blue {
+  --primary-color: #0284c7;
+  --primary-hover-color: #0369a1;
+  --primary-light-color: #f0f9ff;
+  --primary-text: #ffffff;
+  --sidebar-bg: #0f172a;
+  --sidebar-text: #f8fafc;
+  --sidebar-hover: #1e293b;
+  --sidebar-active: #334155;
+}
+
+.orange {
+  --primary-color: #E85D22;
+  --primary-hover-color: #D64D1B;
+  --primary-light-color: #FFF7F3;
+  --primary-text: #ffffff;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #0f172a;
+  --sidebar-hover: #fff3ed;
+  --sidebar-active: #ffe3d3;
+}
+
+.green {
+  --primary-color: #07C160;
+  --primary-hover-color: #06AD56;
+  --primary-light-color: #F2FAF5;
+  --primary-text: #ffffff;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #1f2937;
+  --sidebar-hover: #f3f4f6;
+  --sidebar-active: #e5e7eb;
+}
+
+@layer utilities {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    scrollbar-gutter: stable;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
+  
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  /* 针对侧边栏的特殊滚动条样式 */
+  .bg-sidebar .custom-scrollbar {
+    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+  }
+  .bg-sidebar .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  .bg-sidebar .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+@layer base {
+  html, body {
+    @apply h-full m-0 p-0 overflow-hidden;
+  }
+  #__next, [data-reactroot] {
+    @apply h-full;
+  }
+}
+
+/* 统一按钮样式 */
+.btn-primary {
+  background-color: var(--primary-color);
+  color: var(--primary-text);
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover-color);
+}
+
+.bg-primary {
+  background-color: var(--primary-color);
+}
+
+.text-primary {
+  color: var(--primary-color);
+}
+
+.bg-sidebar {
+  background-color: var(--sidebar-bg);
+}
+
+.text-sidebar {
+  color: var(--sidebar-text);
+}
+
+.bg-sidebar-hover {
+  background-color: var(--sidebar-hover);
+}
+
+.bg-sidebar-active {
+  background-color: var(--sidebar-active);
+}
+
+.border-primary {
+  border-color: var(--primary-color);
+}
+
+.bg-primary-light {
+  background-color: var(--primary-light-color);
+}
