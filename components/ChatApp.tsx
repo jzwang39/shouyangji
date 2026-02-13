@@ -731,7 +731,28 @@ export default function ChatApp(props: Props) {
         }
       );
       if (!res.ok) {
-        throw new Error(await res.text());
+        const contentType = res.headers.get("content-type") ?? "";
+        let details = "";
+        if (contentType.includes("application/json")) {
+          try {
+            const data = (await res.json()) as { error?: unknown; message?: unknown };
+            if (typeof data.error === "string") details = data.error;
+            else if (typeof data.message === "string") details = data.message;
+          } catch {
+          }
+        } else {
+          details = (await res.text()).trim();
+        }
+        const safeDetails =
+          details && !details.includes("<") && !details.includes("&lt;")
+            ? details
+            : "";
+        let hint = "";
+        if (res.status === 504) hint = "网关超时";
+        if (res.status === 502) hint = "网关错误";
+        if (res.status === 503) hint = "服务不可用";
+        const message = safeDetails || `发送失败（HTTP ${res.status}${hint ? `：${hint}` : ""}）`;
+        throw new Error(message);
       }
       setCurrentInput("");
       setDrafts((prev) =>
