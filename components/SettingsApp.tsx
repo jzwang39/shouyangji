@@ -86,6 +86,10 @@ export default function SettingsApp(props: Props) {
   const [newRoleAgentIds, setNewRoleAgentIds] = useState<number[]>([]);
   const [creatingRole, setCreatingRole] = useState(false);
   const [loadingRoles, setLoadingRoles] = useState(false);
+  const [editingRole, setEditingRole] = useState<AgentRole | null>(null);
+  const [editRoleName, setEditRoleName] = useState("");
+  const [editRoleAgentIds, setEditRoleAgentIds] = useState<number[]>([]);
+  const [savingRoleEdit, setSavingRoleEdit] = useState(false);
   const [newUser, setNewUser] = useState({
     username: "",
     password: "",
@@ -194,6 +198,74 @@ export default function SettingsApp(props: Props) {
       setError(e.message ?? "创建角色失败");
     } finally {
       setCreatingRole(false);
+    }
+  };
+
+  const handleOpenEditRole = (role: AgentRole) => {
+    setEditingRole(role);
+    setEditRoleName(role.name);
+    setEditRoleAgentIds(role.agentIds);
+    setError(null);
+  };
+
+  const handleToggleEditRoleAgent = (agentId: number) => {
+    setEditRoleAgentIds((prev) =>
+      prev.includes(agentId)
+        ? prev.filter((id) => id !== agentId)
+        : [...prev, agentId]
+    );
+  };
+
+  const handleSaveRoleEdit = async () => {
+    if (!editingRole) return;
+    const name = editRoleName.trim();
+    if (!name) {
+      setError("角色名称不能为空");
+      return;
+    }
+    if (editRoleAgentIds.length === 0) {
+      setError("请至少选择一个智能体");
+      return;
+    }
+    setSavingRoleEdit(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/agent-roles", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingRole.id,
+          name,
+          agentIds: editRoleAgentIds
+        })
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      setEditingRole(null);
+      await reloadRoles();
+    } catch (e: any) {
+      setError(e.message ?? "修改角色失败");
+    } finally {
+      setSavingRoleEdit(false);
+    }
+  };
+
+  const handleDeleteRole = async (roleId: number) => {
+    if (!window.confirm("确定要删除该角色吗？")) return;
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/agent-roles", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: roleId })
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      await reloadRoles();
+    } catch (e: any) {
+      setError(e.message ?? "删除角色失败");
     }
   };
 
@@ -726,6 +798,10 @@ export default function SettingsApp(props: Props) {
                       <th className="border-b px-2 py-1 text-left">
                         包含的智能体
                       </th>
+                      {(currentUser.role === "admin" ||
+                        currentUser.role === "super_admin") && (
+                        <th className="border-b px-2 py-1 text-left">操作</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -743,6 +819,27 @@ export default function SettingsApp(props: Props) {
                           <td className="border-b px-2 py-1">
                             {names || "（未配置）"}
                           </td>
+                          {(currentUser.role === "admin" ||
+                            currentUser.role === "super_admin") && (
+                            <td className="border-b px-2 py-1">
+                              <div className="flex flex-wrap gap-1">
+                                <button
+                                  type="button"
+                                  className="rounded border px-1 py-0.5"
+                                  onClick={() => handleOpenEditRole(role)}
+                                >
+                                  修改
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded border px-1 py-0.5 text-red-500"
+                                  onClick={() => handleDeleteRole(role.id)}
+                                >
+                                  删除
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -750,6 +847,86 @@ export default function SettingsApp(props: Props) {
                 </table>
               </div>
             </div>
+
+            {editingRole ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div className="w-full max-w-xl rounded-xl bg-white p-4 shadow-xl">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-sm font-semibold">
+                      修改角色（#{editingRole.id}）
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded border px-2 py-1 text-[11px]"
+                      onClick={() => setEditingRole(null)}
+                      disabled={savingRoleEdit}
+                    >
+                      关闭
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-[11px] text-slate-600">
+                        角色名称
+                      </label>
+                      <input
+                        className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        value={editRoleName}
+                        onChange={(event) => setEditRoleName(event.target.value)}
+                        disabled={savingRoleEdit}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="mb-1 block text-[11px] text-slate-600">
+                        包含的智能体
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {agents.map((agent) => {
+                          const selected = editRoleAgentIds.includes(agent.id);
+                          return (
+                            <button
+                              key={agent.id}
+                              type="button"
+                              className={`rounded px-2 py-1 text-[11px] ${
+                                selected
+                                  ? "bg-primary text-white"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                              onClick={() =>
+                                handleToggleEditRoleAgent(agent.id)
+                              }
+                              disabled={savingRoleEdit}
+                            >
+                              {agent.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      className="rounded border px-3 py-1 text-xs"
+                      onClick={() => setEditingRole(null)}
+                      disabled={savingRoleEdit}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                      onClick={handleSaveRoleEdit}
+                      disabled={savingRoleEdit}
+                    >
+                      {savingRoleEdit ? "保存中..." : "保存"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

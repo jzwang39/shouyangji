@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { query } from "@/lib/db";
+import { getPool, query } from "@/lib/db";
 import { logOperation } from "@/lib/operations";
 
 function assertAdmin(session: any) {
@@ -102,3 +102,151 @@ export async function POST(request: Request) {
   return new NextResponse(null, { status: 201 });
 }
 
+export async function PUT(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+  try {
+    assertAdmin(session);
+  } catch {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+  const userId = Number((session.user as any).id);
+  const body = await request.json();
+  const roleId = Number(body.id);
+  const name = String(body.name ?? "").trim();
+  const agentIds = Array.isArray(body.agentIds)
+    ? Array.from(
+        new Set(
+          body.agentIds
+            .map((id: any) => Number(id))
+            .filter((id: number) => id > 0)
+        )
+      )
+    : [];
+
+  if (!Number.isFinite(roleId) || roleId <= 0) {
+    return new NextResponse("角色 ID 不合法", { status: 400 });
+  }
+  if (!name) {
+    return new NextResponse("角色名称不能为空", { status: 400 });
+  }
+  if (agentIds.length === 0) {
+    return new NextResponse("请至少选择一个智能体", { status: 400 });
+  }
+
+  const exists = await query<{ id: number }>(
+    "SELECT id FROM agent_roles WHERE id = ? LIMIT 1",
+    [roleId]
+  );
+  if (exists.length === 0) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
+  const conn = await getPool().getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query("UPDATE agent_roles SET name = ? WHERE id = ?", [
+      name,
+      roleId
+    ]);
+    await conn.query("DELETE FROM agent_role_members WHERE role_id = ?", [
+      roleId
+    ]);
+
+    const values: any[] = [];
+    const placeholders: string[] = [];
+    for (const agentId of agentIds) {
+      placeholders.push("(?, ?)");
+      values.push(roleId, agentId);
+    }
+    await conn.query(
+      `INSERT INTO agent_role_members (role_id, agent_id) VALUES ${placeholders.join(
+        ", "
+      )}`,
+      values
+    );
+    await conn.commit();
+  } catch (e) {
+    try {
+      await conn.rollback();
+    } catch {}
+    throw e;
+  } finally {
+    conn.release();
+  }
+
+  await logOperation({
+    userId,
+    action: "update_agent_role",
+    targetType: "agent_role",
+    targetId: roleId,
+    metadata: {
+      name,
+      agentIds
+    }
+  });
+
+  return new NextResponse(null, { status: 204 });
+}
+
+export async function DELETE(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+  try {
+    assertAdmin(session);
+  } catch {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+  const userId = Number((session.user as any).id);
+  const body = await request.json();
+  const roleId = Number(body.id);
+  if (!Number.isFinite(roleId) || roleId <= 0) {
+    return new NextResponse("角色 ID 不合法", { status: 400 });
+  }
+
+  const exists = await query<{ id: number }>(
+    "SELECT id FROM agent_roles WHERE id = ? LIMIT 1",
+    [roleId]
+  );
+  if (exists.length === 0) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
+  const used = await query<{ cnt: number }>(
+    "SELECT COUNT(*) AS cnt FROM user_agent_roles WHERE role_id = ?",
+    [roleId]
+  );
+  if ((used[0]?.cnt ?? 0) > 0) {
+    return new NextResponse("该角色已被用户使用，无法删除", { status: 400 });
+  }
+
+  const conn = await getPool().getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query("DELETE FROM agent_role_members WHERE role_id = ?", [
+      roleId
+    ]);
+    await conn.query("DELETE FROM agent_roles WHERE id = ?", [roleId]);
+    await conn.commit();
+  } catch (e) {
+    try {
+      await conn.rollback();
+    } catch {}
+    throw e;
+  } finally {
+    conn.release();
+  }
+
+  await logOperation({
+    userId,
+    action: "delete_agent_role",
+    targetType: "agent_role",
+    targetId: roleId
+  });
+
+  return new NextResponse(null, { status: 204 });
+}
