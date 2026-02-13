@@ -863,43 +863,65 @@ export async function callAiWithPrompt(prompt: string) {
     throw new Error("AI 配置未设置，请先在设置页中配置模型和 API Key");
   }
   const setting = rows[0];
-  const response = await fetch("https://yunwu.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: setting.api_key
-    },
-    //signal: AbortSignal.timeout(600000),
-    body: JSON.stringify({
-      model:  "claude-sonnet-4-5-20250929-thinking",
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: 200000
-    })
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      text || `调用 AI 接口失败，状态码：${response.status.toString()}`
-    );
-  }
-  const bodyText = await response.text();
+
+  const rawTimeoutMs = process.env.AI_TIMEOUT_MS ?? process.env.AI_REQUEST_TIMEOUT_MS;
+  const timeoutMs = rawTimeoutMs ? Number(rawTimeoutMs) : 600000;
+  const effectiveTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 600000;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), effectiveTimeoutMs);
+
   try {
-    const data = JSON.parse(bodyText) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const content = data.choices?.[0]?.message?.content;
-    if (content && typeof content === "string") {
-      return content;
+    const response = await fetch("https://yunwu.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: setting.api_key
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5-20250929-thinking",
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 200000
+      })
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        text || `调用 AI 接口失败，状态码：${response.status.toString()}`
+      );
     }
-  } catch {
+    const bodyText = await response.text();
+    try {
+      const data = JSON.parse(bodyText) as {
+        choices?: { message?: { content?: string } }[];
+      };
+      const content = data.choices?.[0]?.message?.content;
+      if (content && typeof content === "string") {
+        return content;
+      }
+    } catch {
+    }
+    return bodyText;
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "name" in error &&
+      (error as { name?: string }).name === "AbortError"
+    ) {
+      throw new Error(`调用 AI 接口超时（${effectiveTimeoutMs}ms）`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return bodyText;
 }
 
 export function buildPositioningPrompt(description: string) {
