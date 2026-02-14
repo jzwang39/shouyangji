@@ -5,6 +5,19 @@ type AiSettings = {
   api_key: string;
 };
 
+function escapeRegExp(input: string) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderTemplate(template: string, vars: Record<string, string>) {
+  let result = template;
+  for (const [key, value] of Object.entries(vars)) {
+    const pattern = new RegExp(`\\{\\{\\s*${escapeRegExp(key)}\\s*\\}\\}`, "g");
+    result = result.replace(pattern, value);
+  }
+  return result;
+}
+
 export function buildProductOnePagerPrompt(description: string) {
   return `${description}`;
 }
@@ -868,59 +881,196 @@ export async function callAiWithPrompt(prompt: string) {
   const timeoutMs = rawTimeoutMs ? Number(rawTimeoutMs) : 600000;
   const effectiveTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 600000;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), effectiveTimeoutMs);
+  const baseUrlRaw =
+    process.env.AI_BASE_URL ??
+    process.env.AI_API_BASE_URL ??
+    process.env.OPENAI_BASE_URL ??
+    "https://yunwu.ai";
+  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const url = `${baseUrl}/v1/chat/completions`;
+  const model = "claude-sonnet-4-5-20250929-thinking";
+  const rawMaxTokens = process.env.AI_MAX_TOKENS;
+  const maxTokens = rawMaxTokens ? Number(rawMaxTokens) : 8192;
+  const effectiveMaxTokens = Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 200000;
+  const useStream = (process.env.AI_STREAM ?? "1") !== "0";
 
-  try {
-    const response = await fetch("https://yunwu.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: setting.api_key
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929-thinking",
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        max_tokens: 200000
-      })
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(
-        text || `调用 AI 接口失败，状态码：${response.status.toString()}`
-      );
-    }
-    const bodyText = await response.text();
-    try {
-      const data = JSON.parse(bodyText) as {
-        choices?: { message?: { content?: string } }[];
-      };
-      const content = data.choices?.[0]?.message?.content;
-      if (content && typeof content === "string") {
-        return content;
-      }
-    } catch {
-    }
-    return bodyText;
-  } catch (error) {
-    if (
+  const isAbortError = (error: unknown) => {
+    return (
       error &&
       typeof error === "object" &&
       "name" in error &&
       (error as { name?: string }).name === "AbortError"
-    ) {
-      throw new Error(`调用 AI 接口超时（${effectiveTimeoutMs}ms）`);
+    );
+  };
+
+  const sleep = (ms: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  const getNetworkCause = (error: any) => {
+    if (!error || typeof error !== "object") return null;
+    const cause = "cause" in error ? (error as any).cause : null;
+    if (cause && typeof cause === "object") return cause;
+    return error;
+  };
+
+  const isConnectTimeout = (error: any) => {
+    const cause = getNetworkCause(error);
+    const name = String(cause?.name ?? "");
+    const code = String(cause?.code ?? "");
+    const message = String(cause?.message ?? "");
+    if (name.includes("ConnectTimeout")) return true;
+    if (code.toUpperCase().includes("CONNECT_TIMEOUT")) return true;
+    if (message.toLowerCase().includes("connect timeout")) return true;
+    return false;
+  };
+
+  const isHeadersTimeout = (error: any) => {
+    const cause = getNetworkCause(error);
+    const name = String(cause?.name ?? "");
+    const code = String(cause?.code ?? "");
+    const message = String(cause?.message ?? "");
+    if (name.includes("HeadersTimeout")) return true;
+    if (code.toUpperCase().includes("HEADERS_TIMEOUT")) return true;
+    if (message.toLowerCase().includes("headers timeout")) return true;
+    return false;
+  };
+
+  const readEventStreamContent = async (response: Response) => {
+    if (!response.body) return "";
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let output = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      while (true) {
+        const lineBreakIndex = buffer.indexOf("\n");
+        if (lineBreakIndex === -1) break;
+        const rawLine = buffer.slice(0, lineBreakIndex);
+        buffer = buffer.slice(lineBreakIndex + 1);
+        const line = rawLine.trim();
+        if (!line.startsWith("data:")) continue;
+        const data = line.slice("data:".length).trim();
+        if (!data) continue;
+        if (data === "[DONE]") return output;
+        try {
+          const parsed = JSON.parse(data) as any;
+          const delta =
+            parsed?.choices?.[0]?.delta?.content ??
+            parsed?.choices?.[0]?.message?.content ??
+            "";
+          if (typeof delta === "string") {
+            output += delta;
+          }
+        } catch {
+        }
+      }
     }
+    return output;
+  };
+
+  try {
+    const attemptDelaysMs = [0, 400, 1200];
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < attemptDelaysMs.length; attempt += 1) {
+      if (attemptDelaysMs[attempt] > 0) {
+        await sleep(attemptDelaysMs[attempt]);
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), effectiveTimeoutMs);
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            Accept: useStream ? "text/event-stream, application/json" : "application/json",
+            "Content-Type": "application/json",
+            Authorization: setting.api_key
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: "user",
+                content: prompt
+              }
+            ],
+            max_tokens: effectiveMaxTokens,
+            stream: useStream
+          })
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          try {
+            const data = JSON.parse(text) as any;
+            const msg =
+              data?.error?.message_zh ||
+              data?.error?.message ||
+              data?.message_zh ||
+              data?.message;
+            if (typeof msg === "string" && msg.trim()) {
+              throw new Error(`${msg.trim()}（当前模型：${model}）`);
+            }
+          } catch {
+          }
+          throw new Error(
+            text || `调用 AI 接口失败，状态码：${response.status.toString()}（当前模型：${model}）`
+          );
+        }
+        const contentType = response.headers.get("content-type") ?? "";
+        if (useStream && contentType.includes("text/event-stream")) {
+          const streamed = await readEventStreamContent(response);
+          if (streamed && typeof streamed === "string") {
+            return streamed;
+          }
+        }
+        const bodyText = await response.text();
+        try {
+          const data = JSON.parse(bodyText) as any;
+          const content =
+            data?.choices?.[0]?.message?.content ??
+            data?.choices?.[0]?.delta?.content;
+          if (content && typeof content === "string") {
+            return content;
+          }
+        } catch {
+        }
+        return bodyText;
+      } catch (error) {
+        lastError = error;
+        if (isAbortError(error)) {
+          throw new Error(`调用 AI 接口超时（${effectiveTimeoutMs}ms）`, {
+            cause: error as any
+          });
+        }
+        if (isConnectTimeout(error)) {
+          if (attempt < attemptDelaysMs.length - 1) {
+            continue;
+          }
+          throw new Error(`AI 接口连接超时，请检查网络或 AI_BASE_URL（当前：${baseUrl}）`, {
+            cause: error as any
+          });
+        }
+        if (isHeadersTimeout(error)) {
+          if (attempt < attemptDelaysMs.length - 1) {
+            continue;
+          }
+          throw new Error(
+            `AI 接口响应超时（等待响应头超时），请检查网关是否拥堵/限流或更换模型（当前：${baseUrl}，模型：${model}）`,
+            { cause: error as any }
+          );
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+    throw lastError;
+  } catch (error) {
     throw error;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 
@@ -975,24 +1125,172 @@ export function buildPositioningPrompt(description: string) {
 最终定位：用葛洪归元法，解决中老年人群因元气亏虚导致的年老体衰问题，最终实现老当益壮、延年益寿。`;
 }
 
-export function buildPromptForAgent(slug: string, content: string) {
+function getDefaultPromptTemplate(slug: string) {
   if (slug === "product-one-pager") {
-    return buildProductOnePagerPrompt(content);
+    return buildProductOnePagerPrompt("{{content}}");
   }
   if (slug === "positioning-helper") {
-    return buildPositioningPrompt(content);
+    return buildPositioningPrompt("{{description}}");
   }
   if (slug === "four-things") {
-    return buildFourThingsPrompt(content);
+    return buildFourThingsPrompt("{{content}}");
   }
   if (slug === "nine-grid") {
-    return buildNineGridPrompt(content);
+    return buildNineGridPrompt("{{content}}");
   }
   if (slug === "course-outline") {
-    return buildCourseOutlinePromptV2(content);
+    return `根据输入的四件事信息{{shijianshi}}和九宫格信息{{jiugongge}}，请完成以下任务：
+
+1、先梳理四件事和九宫格之间的详细对应关系。
+
+2、在此基础上，参考产品信息，以四件事儿为整个课程的底层逻辑，以九宫格作为骨架，设计一门 15 节课的完整课程大纲（不用按周划分），并标明每一节课所在阶段。
+
+3、课程节奏要求（按阶段设计，不必逐字照抄，可以灵活发挥）：
+- 第 1 阶段：1 节，共起愿景。建立【核心好处】愿景，树立主讲人与品牌专业形象，说明活动初心，并结合国家“健康中国”相关表述与中医药背景，引发认同感和使命感。
+- 第 2 阶段：4 节，小单铺垫。通过【核心问题】与典型疾病案例，强化危机与解决渴望；提出【核心技术】，采用排他式讲解和多组真实案例，让用户相信只有该【核心技术】才能解决问题，并在该阶段末尾引出体验名额或小单成交。
+- 第 3 阶段：5 节，培养服用习惯并引导效果。围绕“吃够周期、吃够量身体才能大变样”的观念，结合案例、数据、用户反馈，持续强化长期调理的重要性，并分不同疾病主题展开。
+- 第 4 阶段：2 节，锚点铺垫。通过案例、价格锚点、学员来信等方式，强化【核心技术】价值感与稀缺性，建立价格对比与心理锚点。
+- 第 5 阶段：2 节，销售铺垫。继续通过案例和情感故事渗透长期调理观念，铺垫最终大单成交的合理性与必要性。
+- 第 6 阶段：1 节，销售收尾。整体按照九宫格信息{{jiugongge}}的节奏，遵循“建立渴望—制造恐惧—给出方案—证明效果—破价成交”的逻辑闭环，并设计稳单、加单与售后信任相关内容。
+
+4、每一节课开头都需要给出清晰的“课程目标”，让主讲人一眼就知道这一节课的核心任务；所有课程目标都不能偏离该节所在阶段的总体要求。
+
+请用结构化方式输出 15 节课的大纲（标明阶段、节次、课程标题、课程目标、核心内容要点），整体控制在 10000 字以内。`;
   }
   if (slug === "course-transcript") {
-    return buildCourseTranscriptPrompt(content);
+    return `根据输入的定位信息{{dingwei}}，产品信息{{chanpin}}、四件事儿{{shijianshi}}、九宫格{{jiugongge}}、四件事和九宫格的关系{{guanxi}}，按照每一节产品课程大纲（带12步结构）{{kegang}}的内容框架，扩写成一个60分钟的课程话术稿。
+其中{{lastkegang}}是上一节课的内容，注意扩写本节内容的时候流畅衔接。
+扩写的内容中如果遇到案例、数据，要保证真实有效，有出处，不能编造。
+  
+结果控制在8000个字左右。`;
   }
-  return content;
+  return "";
+}
+
+function buildPromptByTemplate(slug: string, template: string, content: string) {
+  if (slug === "course-outline") {
+    const normalized = content.trim();
+    let shijianshi = normalized;
+    let jiugongge = normalized;
+
+    const nineIndex = normalized.indexOf("九宫格");
+    if (nineIndex !== -1) {
+      const before = normalized.slice(0, nineIndex).trim();
+      const after = normalized.slice(nineIndex).trim();
+      if (before) {
+        shijianshi = before;
+      }
+      if (after) {
+        jiugongge = after;
+      }
+    } else {
+      const parts = normalized.split(/\n\s*\n/);
+      if (parts.length >= 2) {
+        shijianshi = parts[0].trim();
+        jiugongge = parts.slice(1).join("\n\n").trim();
+      }
+    }
+
+    return renderTemplate(template, { shijianshi, jiugongge, content });
+  }
+
+  if (slug === "course-transcript") {
+    const normalized = content.trim();
+    const sectionKeys = [
+      { key: "chanpin", label: "产品信息" },
+      { key: "dingwei", label: "定位" },
+      { key: "shijianshi", label: "四件事" },
+      { key: "jiugongge", label: "九宫格" },
+      { key: "guanxi", label: "四件事和九宫格关系" },
+      { key: "kegang", label: "本节课大纲" },
+      { key: "lastkegang", label: "上节课大纲" }
+    ] as const;
+
+    const buckets: Record<
+      (typeof sectionKeys)[number]["key"],
+      string[]
+    > = {
+      chanpin: [],
+      dingwei: [],
+      shijianshi: [],
+      jiugongge: [],
+      guanxi: [],
+      kegang: [],
+      lastkegang: []
+    };
+
+    let currentKey: (typeof sectionKeys)[number]["key"] | null = null;
+    const lines = normalized.split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        if (currentKey) {
+          buckets[currentKey].push(line);
+        }
+        continue;
+      }
+      const found = sectionKeys.find(({ label }) => {
+        if (trimmed === label) return true;
+        if (trimmed.startsWith(label + ":")) return true;
+        if (trimmed.startsWith(label + "：")) return true;
+        if (trimmed.startsWith("【" + label) || trimmed.startsWith("「" + label)) {
+          return true;
+        }
+        return false;
+      });
+      if (found) {
+        currentKey = found.key;
+        continue;
+      }
+      if (!currentKey) {
+        currentKey = "chanpin";
+      }
+      buckets[currentKey].push(line);
+    }
+
+    const chanpin = buckets.chanpin.join("\n").trim();
+    const dingwei = buckets.dingwei.join("\n").trim();
+    const shijianshi = buckets.shijianshi.join("\n").trim();
+    const jiugongge = buckets.jiugongge.join("\n").trim();
+    const guanxi = buckets.guanxi.join("\n").trim();
+    const kegang = buckets.kegang.join("\n").trim();
+    const lastkegangRaw = buckets.lastkegang.join("\n").trim();
+    const lastkegang = lastkegangRaw || "（当前为第一节课程，无上一节课大纲）";
+
+    return renderTemplate(template, {
+      chanpin,
+      dingwei,
+      shijianshi,
+      jiugongge,
+      guanxi,
+      kegang,
+      lastkegang,
+      content,
+      description: content
+    });
+  }
+
+  return renderTemplate(template, {
+    content,
+    description: content
+  });
+}
+
+export async function buildPromptForAgent(slug: string, content: string) {
+  const rows = await query<{ prompt: string | null; system_prompt: string | null }>(
+    `SELECT p.prompt, a.system_prompt
+     FROM agents a
+     LEFT JOIN agent_prompts p ON p.agent_slug = a.slug
+     WHERE a.slug = ?
+     LIMIT 1`,
+    [slug]
+  );
+  const template =
+    (rows[0]?.prompt ?? "").trim() ||
+    (rows[0]?.system_prompt ?? "").trim() ||
+    getDefaultPromptTemplate(slug);
+  if (!template) {
+    return content;
+  }
+  return buildPromptByTemplate(slug, template, content);
 }

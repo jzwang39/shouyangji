@@ -248,6 +248,7 @@ export default function ChatApp(props: Props) {
     currentLesson?: string;
     currentLessonOutline?: string;
   } | null>(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
 
   const getErrorMessage = useCallback((e: any, fallback: string) => {
     if (e && typeof e.message === "string") {
@@ -308,13 +309,15 @@ export default function ChatApp(props: Props) {
       return "";
     }
     const text = referenceForm.courseOutlineContent;
-    const regex = /#### \*\*第(\d+)节[^]*?(?=^#### \*\*第\d+节|\Z)/gm;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(text)) !== null) {
+    const regex = /^#{2,4}\s*(?:\*\*)?第(\d+)节.*$/gm;
+    const matches = Array.from(text.matchAll(regex));
+    for (let i = 0; i < matches.length; i += 1) {
+      const match = matches[i];
       const value = Number(match[1]);
-      if (value === lessonIndex) {
-        return match[0].trim();
-      }
+      if (value !== lessonIndex) continue;
+      const start = match.index ?? 0;
+      const end = i + 1 < matches.length ? (matches[i + 1].index ?? text.length) : text.length;
+      return text.slice(start, end).trim();
     }
     return "";
   }, [currentAgent, referenceForm?.courseOutlineContent, referenceForm?.currentLesson]);
@@ -335,13 +338,15 @@ export default function ChatApp(props: Props) {
       return "";
     }
     const text = referenceForm.courseOutlineContent;
-    const regex = /#### \*\*第(\d+)节[^]*?(?=^#### \*\*第\d+节|\Z)/gm;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(text)) !== null) {
+    const regex = /^#{2,4}\s*(?:\*\*)?第(\d+)节.*$/gm;
+    const matches = Array.from(text.matchAll(regex));
+    for (let i = 0; i < matches.length; i += 1) {
+      const match = matches[i];
       const value = Number(match[1]);
-      if (value === lessonIndex) {
-        return match[0].trim();
-      }
+      if (value !== lessonIndex) continue;
+      const start = match.index ?? 0;
+      const end = i + 1 < matches.length ? (matches[i + 1].index ?? text.length) : text.length;
+      return text.slice(start, end).trim();
     }
     return "";
   }, [currentAgent, referenceForm?.courseOutlineContent, referenceForm?.currentLesson]);
@@ -387,6 +392,7 @@ export default function ChatApp(props: Props) {
   useEffect(() => {
     if (!currentConversationId) {
       setLoadingMessages(false);
+      setAiGenerating(false);
       return;
     }
 
@@ -681,6 +687,46 @@ export default function ChatApp(props: Props) {
     }
   };
 
+  const pollConversationMessages = useCallback(
+    async (conversationId: number, assistantMessageId: number) => {
+      setAiGenerating(true);
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < 5 * 60 * 1000) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 1500);
+        });
+        if (currentConversationId !== conversationId) {
+          setAiGenerating(false);
+          return;
+        }
+        try {
+          const res = await fetch(`/api/conversations/${conversationId}/messages`);
+          if (!res.ok) {
+            setAiGenerating(false);
+            return;
+          }
+          const data: Message[] = await res.json();
+          setMessages(data);
+          const target = data.find((m) => m.id === assistantMessageId);
+          if (!target) {
+            continue;
+          }
+          if (typeof target.content === "string" && target.content.trim()) {
+            if (!target.content.includes("正在生成")) {
+              setAiGenerating(false);
+              return;
+            }
+          }
+        } catch {
+          setAiGenerating(false);
+          return;
+        }
+      }
+      setAiGenerating(false);
+    },
+    [currentConversationId]
+  );
+
   const handleSend = async () => {
     if (!currentInput.trim() || sending) return;
     if (!selectedAgentId) {
@@ -762,12 +808,17 @@ export default function ChatApp(props: Props) {
       const message: Message = data.message;
       const aiReply: Message | null = data.aiReply ?? null;
       const prompt: string | null = data.aiPrompt ?? null;
+      const aiReplyPending: boolean = data.aiReplyPending === true;
+      setAiGenerating(aiReplyPending);
       setMessages((prev) => {
         const replaced = prev.map((m) => (m.id === tempId ? message : m));
         return aiReply ? [...replaced, aiReply] : replaced;
       });
       if (aiReply && prompt) {
         setAiPrompts((prev) => ({ ...prev, [aiReply.id]: prompt }));
+      }
+      if (aiReply && aiReplyPending) {
+        void pollConversationMessages(conversationId, aiReply.id);
       }
       setConversations((prev) =>
         prev.map((conversation) => {
@@ -1493,6 +1544,11 @@ export default function ChatApp(props: Props) {
                 {error}
               </div>
             ) : null}
+            {aiGenerating ? (
+              <div className="mb-3 rounded bg-sky-50 px-3 py-2 text-xs text-sky-700">
+                任务已提交，正在生成结果，请稍候...
+              </div>
+            ) : null}
 
             {loadingMessages ? (
               <div className="text-xs text-slate-500">加载中...</div>
@@ -1592,6 +1648,7 @@ export default function ChatApp(props: Props) {
               <span>Enter 发送，Shift+Enter 换行</span>
               <div className="flex items-center gap-3">
                 {sending ? <span>发送中...</span> : null}
+                {!sending && aiGenerating ? <span>已提交，生成中...</span> : null}
                 {(currentAgent?.slug === "positioning-helper" ||
                   currentAgent?.slug === "four-things" ||
                   currentAgent?.slug === "nine-grid" ||
@@ -1623,7 +1680,7 @@ export default function ChatApp(props: Props) {
             />
             <div className="mt-2 flex items-center justify-between">
               <div className="text-xs text-slate-500">
-                {sending ? "正在生成回复..." : ""}
+                {sending ? "正在发送..." : aiGenerating ? "已提交，正在生成回复..." : ""}
               </div>
               <div className="flex items-center gap-2">
                 {sending ? (
@@ -1640,10 +1697,10 @@ export default function ChatApp(props: Props) {
                   className="rounded bg-primary px-4 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
                   onClick={handleSend}
                   disabled={
-                    sending || !currentInput.trim()
+                    sending || aiGenerating || !currentInput.trim()
                   }
                 >
-                  发送
+                  {sending ? "发送中..." : aiGenerating ? "生成中..." : "发送"}
                 </button>
               </div>
             </div>

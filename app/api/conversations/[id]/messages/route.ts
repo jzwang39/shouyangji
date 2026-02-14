@@ -108,48 +108,11 @@ export async function POST(request: Request, context: Params) {
     ]);
 
     if (aiAgents.has(conversation.slug)) {
-      const prompt = buildPromptForAgent(conversation.slug, content);
+      const prompt = await buildPromptForAgent(conversation.slug, content);
       aiPrompt = prompt;
-      let aiText: string;
-      let isError = false;
-      try {
-        aiText = await callAiWithPrompt(prompt);
-      } catch (e: any) {
-        let message = "";
-        if (typeof e?.message === "string" && e.message) {
-          message = e.message;
-        }
-        const extra: string[] = [];
-        if (e?.name && typeof e.name === "string" && e.name !== "Error") {
-          extra.push(`错误类型: ${e.name}`);
-        }
-        if (e?.cause) {
-          let causeText = "";
-          if (typeof e.cause === "string") {
-            causeText = e.cause;
-          } else {
-            try {
-              causeText = JSON.stringify(e.cause);
-            } catch {
-              causeText = String(e.cause);
-            }
-          }
-          if (causeText) {
-            extra.push(`详细原因: ${causeText}`);
-          }
-        }
-        if (!message) {
-          message = "调用 AI 接口失败，请稍后重试";
-        }
-        if (extra.length) {
-          message = `${message}\n${extra.join("\n")}`;
-        }
-        aiText = `【系统提示】${message}`;
-        isError = true;
-      }
       const aiResult: any = await query(
         "INSERT INTO messages (conversation_id, role, content) VALUES (?, 'assistant', ?)",
-        [conversationId, aiText]
+        [conversationId, "正在生成，请稍候..."]
       );
       const aiMessageId = aiResult.insertId as number;
       const [aiMessage] = await query(
@@ -157,20 +120,70 @@ export async function POST(request: Request, context: Params) {
         [aiMessageId]
       );
       aiReply = aiMessage;
-      await logOperation({
-        userId,
-        action: isError ? "ai_error" : "ai_reply",
-        targetType: "message",
-        targetId: aiMessageId,
-        metadata: {
-          conversationId,
-          agentSlug: conversation.slug,
-          prompt
+
+      void (async () => {
+        let aiText = "";
+        let isError = false;
+        try {
+          aiText = await callAiWithPrompt(prompt);
+        } catch (e: any) {
+          let message = "";
+          if (typeof e?.message === "string" && e.message) {
+            message = e.message;
+          }
+          const extra: string[] = [];
+          if (e?.name && typeof e.name === "string" && e.name !== "Error") {
+            extra.push(`错误类型: ${e.name}`);
+          }
+          if (e?.cause) {
+            let causeText = "";
+            if (typeof e.cause === "string") {
+              causeText = e.cause;
+            } else {
+              try {
+                causeText = JSON.stringify(e.cause);
+              } catch {
+                causeText = String(e.cause);
+              }
+            }
+            if (causeText) {
+              extra.push(`详细原因: ${causeText}`);
+            }
+          }
+          if (!message) {
+            message = "调用 AI 接口失败，请稍后重试";
+          }
+          if (extra.length) {
+            message = `${message}\n${extra.join("\n")}`;
+          }
+          aiText = `【系统提示】${message}`;
+          isError = true;
         }
-      });
+
+        await query("UPDATE messages SET content = ?, updated_at = NOW() WHERE id = ?", [
+          aiText,
+          aiMessageId
+        ]);
+        await logOperation({
+          userId,
+          action: isError ? "ai_error" : "ai_reply",
+          targetType: "message",
+          targetId: aiMessageId,
+          metadata: {
+            conversationId,
+            agentSlug: conversation.slug,
+            prompt
+          }
+        });
+      })();
     }
 
-    return NextResponse.json({ message, aiReply, aiPrompt });
+    return NextResponse.json({
+      message,
+      aiReply,
+      aiPrompt,
+      aiReplyPending: aiReply?.content === "正在生成，请稍候..."
+    });
   } catch (e: any) {
     const message =
       typeof e?.message === "string" && e.message

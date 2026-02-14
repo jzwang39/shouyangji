@@ -51,6 +51,13 @@ type AgentRole = {
   agentIds: number[];
 };
 
+type AgentPromptRow = {
+  id: number;
+  slug: string;
+  name: string;
+  systemPrompt: string;
+};
+
 type Props = {
   currentUser: UserInfo;
   initialAiSetting: AiSetting;
@@ -62,7 +69,9 @@ type Props = {
 export default function SettingsApp(props: Props) {
   const { currentUser, initialAiSetting, initialUsers, initialLogs, initialAgents } =
     props;
-  const [tab, setTab] = useState<"ai" | "users" | "logs" | "roles" | "theme">("users");
+  const [tab, setTab] = useState<
+    "ai" | "users" | "logs" | "roles" | "theme" | "prompts"
+  >("users");
   const [aiSetting, setAiSetting] = useState<AiSetting>(initialAiSetting);
   const [modelName, setModelName] = useState(
     initialAiSetting?.modelName ?? ""
@@ -102,6 +111,14 @@ export default function SettingsApp(props: Props) {
   const [creatingUser, setCreatingUser] = useState(false);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agentPrompts, setAgentPrompts] = useState<AgentPromptRow[] | null>(
+    null
+  );
+  const [agentPromptDraft, setAgentPromptDraft] = useState<
+    Record<string, string>
+  >({});
+  const [loadingPrompts, setLoadingPrompts] = useState(false);
+  const [savingPromptSlug, setSavingPromptSlug] = useState<string | null>(null);
 
   useEffect(() => {
     const map: Record<number, Role> = {};
@@ -123,6 +140,14 @@ export default function SettingsApp(props: Props) {
     reloadRoles();
     reloadUserRoles();
   }, []);
+
+  useEffect(() => {
+    if (currentUser.role !== "super_admin") return;
+    if (tab !== "prompts") return;
+    if (loadingPrompts) return;
+    if (agentPrompts) return;
+    reloadPrompts();
+  }, [agentPrompts, currentUser.role, loadingPrompts, tab]);
 
   const reloadRoles = async () => {
     setLoadingRoles(true);
@@ -156,6 +181,58 @@ export default function SettingsApp(props: Props) {
       setUserRoleMap(map);
     } catch (e: any) {
       setError(e.message ?? "加载用户角色失败");
+    }
+  };
+
+  const reloadPrompts = async () => {
+    setLoadingPrompts(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/agent-prompts");
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      const list: AgentPromptRow[] = await res.json();
+      setAgentPrompts(list);
+      const nextDraft: Record<string, string> = {};
+      for (const item of list) {
+        nextDraft[item.slug] = item.systemPrompt ?? "";
+      }
+      setAgentPromptDraft(nextDraft);
+    } catch (e: any) {
+      setError(e.message ?? "加载提示词失败");
+    } finally {
+      setLoadingPrompts(false);
+    }
+  };
+
+  const handleSavePrompt = async (slug: string) => {
+    const systemPrompt = String(agentPromptDraft[slug] ?? "");
+    if (!systemPrompt.trim()) {
+      setError("提示词不能为空");
+      return;
+    }
+    setSavingPromptSlug(slug);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/agent-prompts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, systemPrompt })
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      setAgentPrompts((prev) => {
+        if (!prev) return prev;
+        return prev.map((item) =>
+          item.slug === slug ? { ...item, systemPrompt } : item
+        );
+      });
+    } catch (e: any) {
+      setError(e.message ?? "保存提示词失败");
+    } finally {
+      setSavingPromptSlug(null);
     }
   };
 
@@ -464,6 +541,15 @@ export default function SettingsApp(props: Props) {
             { id: "roles", label: "角色权限", icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" },
             { id: "logs", label: "审计日志", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" },
             { id: "ai", label: "AI 配置", icon: "M13 10V3L4 14h7v7l9-11h-7z" },
+            ...(currentUser.role === "super_admin"
+              ? [
+                  {
+                    id: "prompts",
+                    label: "提示词配置",
+                    icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                  }
+                ]
+              : []),
             { id: "theme", label: "界面风格", icon: "M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" },
           ].map((item) => (
             <button
@@ -970,6 +1056,66 @@ export default function SettingsApp(props: Props) {
               >
                 {savingAi ? "保存中..." : "保存配置"}
               </button>
+            </div>
+          </div>
+        ) : null}
+
+        {tab === "prompts" && currentUser.role === "super_admin" ? (
+          <div className="space-y-6 text-xs">
+            <div className="rounded border border-slate-200 p-3">
+              <div className="mb-2 font-semibold">提示词配置</div>
+              {loadingPrompts ? <div className="text-slate-500">加载中...</div> : null}
+              {!loadingPrompts && agentPrompts ? (
+                <div className="space-y-4">
+                  {agentPrompts.map((item) => (
+                    <div key={item.slug} className="rounded border border-slate-200 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-slate-800 truncate">
+                            {item.name}
+                          </div>
+                          <div className="text-[11px] text-slate-500 truncate">
+                            {item.slug}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="rounded bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                            disabled={savingPromptSlug === item.slug}
+                            onClick={() =>
+                              setAgentPromptDraft((prev) => ({
+                                ...prev,
+                                [item.slug]: item.systemPrompt ?? ""
+                              }))
+                            }
+                          >
+                            恢复
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                            disabled={savingPromptSlug === item.slug}
+                            onClick={() => handleSavePrompt(item.slug)}
+                          >
+                            {savingPromptSlug === item.slug ? "保存中..." : "保存"}
+                          </button>
+                        </div>
+                      </div>
+                      <textarea
+                        className="w-full min-h-[220px] rounded border border-slate-300 px-2 py-2 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary font-mono"
+                        value={agentPromptDraft[item.slug] ?? ""}
+                        onChange={(event) =>
+                          setAgentPromptDraft((prev) => ({
+                            ...prev,
+                            [item.slug]: event.target.value
+                          }))
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}
