@@ -282,11 +282,18 @@ export default function ChatApp(props: Props) {
     if (!referenceForm || !referenceForm.courseOutlineContent) {
       return [];
     }
-    const firstLine =
-      referenceForm.courseOutlineContent.split(/\r?\n/)[0] ?? "";
-    const match = firstLine.match(/(\d+)\s*节课程大纲/);
-    if (!match) return [];
-    const count = Number(match[1]);
+    const text = referenceForm.courseOutlineContent;
+    const headerRegex = /^#{2,4}\s*(?:\*\*)?第(\d+)节.*$/gm;
+    const lessonNumbers = Array.from(text.matchAll(headerRegex))
+      .map((match) => Number(match[1]))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    let count = lessonNumbers.length > 0 ? Math.max(...lessonNumbers) : 0;
+    if (count <= 0) {
+      const match = text.match(/(\d+)\s*节[^\n]*课程大纲/);
+      if (match) {
+        count = Number(match[1]);
+      }
+    }
     if (!Number.isFinite(count) || count <= 0) return [];
     return Array.from({ length: count }, (_, index) => ({
       value: String(index + 1),
