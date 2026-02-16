@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { logOperation } from "@/lib/operations";
 
+export const dynamic = "force-dynamic";
+
 function assertSuperAdmin(session: any) {
   const role = (session.user as any).role;
   if (role !== "super_admin") {
@@ -38,8 +40,9 @@ export async function GET() {
     slug: string;
     name: string;
     prompt: string | null;
+    system_prompt: string | null;
   }>(
-    `SELECT a.id, a.slug, a.name, p.prompt
+    `SELECT a.id, a.slug, a.name, p.prompt, a.system_prompt
      FROM agents a
      LEFT JOIN agent_prompts p ON p.agent_slug = a.slug
      WHERE a.slug IN (${placeholders})
@@ -52,8 +55,13 @@ export async function GET() {
       id: row.id,
       slug: row.slug,
       name: row.name,
-      systemPrompt: row.prompt ?? ""
-    }))
+      systemPrompt: row.prompt ?? row.system_prompt ?? ""
+    })),
+    {
+      headers: {
+        "Cache-Control": "no-store"
+      }
+    }
   );
 }
 
@@ -69,7 +77,12 @@ export async function PUT(request: Request) {
   }
 
   const userId = Number((session.user as any).id);
-  const body = await request.json();
+  let body: any = null;
+  try {
+    body = await request.json();
+  } catch {
+    return new NextResponse("请求体不是合法 JSON", { status: 400 });
+  }
   const slug = String(body.slug ?? "").trim();
   const systemPrompt = String(body.systemPrompt ?? "");
 
@@ -96,6 +109,10 @@ export async function PUT(request: Request) {
     "INSERT INTO agent_prompts (agent_slug, prompt) VALUES (?, ?) ON DUPLICATE KEY UPDATE prompt = VALUES(prompt)",
     [slug, systemPrompt]
   );
+  await query("UPDATE agents SET system_prompt = ? WHERE slug = ?", [
+    systemPrompt,
+    slug
+  ]);
   await logOperation({
     userId,
     action: "update_agent_prompt",
@@ -104,5 +121,10 @@ export async function PUT(request: Request) {
     metadata: { slug }
   });
 
-  return new NextResponse(null, { status: 204 });
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Cache-Control": "no-store"
+    }
+  });
 }

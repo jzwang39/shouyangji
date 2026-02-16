@@ -188,7 +188,9 @@ export default function SettingsApp(props: Props) {
     setLoadingPrompts(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/agent-prompts");
+      const res = await fetch(`/api/admin/agent-prompts?t=${Date.now()}`, {
+        cache: "no-store"
+      });
       if (!res.ok) {
         throw new Error(await res.text());
       }
@@ -223,12 +225,7 @@ export default function SettingsApp(props: Props) {
       if (!res.ok) {
         throw new Error(await res.text());
       }
-      setAgentPrompts((prev) => {
-        if (!prev) return prev;
-        return prev.map((item) =>
-          item.slug === slug ? { ...item, systemPrompt } : item
-        );
-      });
+      await reloadPrompts();
     } catch (e: any) {
       setError(e.message ?? "保存提示词失败");
     } finally {
