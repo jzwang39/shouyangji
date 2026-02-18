@@ -888,11 +888,13 @@ export async function callAiWithPrompt(prompt: string) {
     "https://yunwu.ai";
   const baseUrl = baseUrlRaw.replace(/\/+$/, "");
   const url = `${baseUrl}/v1/chat/completions`;
-  const model = "claude-sonnet-4-5-20250929-thinking";
+  const model = String(setting.model_name ?? "").trim() || "claude-sonnet-4-5-20250929-thinking";
   const rawMaxTokens = process.env.AI_MAX_TOKENS;
   const maxTokens = rawMaxTokens ? Number(rawMaxTokens) : 8192;
   const effectiveMaxTokens = Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 200000;
-  const useStream = (process.env.AI_STREAM ?? "1") !== "0";
+  const useStream =
+    (process.env.AI_STREAM ??
+      (process.env.NODE_ENV === "production" ? "0" : "1")) !== "0";
 
   const isAbortError = (error: unknown) => {
     return (
@@ -996,6 +998,46 @@ export async function callAiWithPrompt(prompt: string) {
   };
 
   try {
+    const buildMessages = (
+      basePrompt: string,
+      previousAssistant: string | null
+    ) => {
+      if (previousAssistant && previousAssistant.trim()) {
+        return [
+          { role: "user", content: basePrompt },
+          { role: "assistant", content: previousAssistant },
+          {
+            role: "user",
+            content:
+              "继续接着上文输出剩余部分，不要重复，保持原有结构与标题层级，直到完整结束。"
+          }
+        ];
+      }
+      return [{ role: "user", content: basePrompt }];
+    };
+
+    const parseChatCompletionContent = (bodyText: string) => {
+      try {
+        const data = JSON.parse(bodyText) as any;
+        const choice = data?.choices?.[0] ?? null;
+        const content =
+          choice?.message?.content ??
+          choice?.delta?.content ??
+          data?.message?.content ??
+          "";
+        const finishReason = choice?.finish_reason ?? null;
+        return {
+          content: typeof content === "string" ? content : "",
+          finishReason:
+            typeof finishReason === "string" || finishReason === null
+              ? finishReason
+              : null
+        };
+      } catch {
+        return { content: "", finishReason: null };
+      }
+    };
+
     const attemptDelaysMs = [0, 400, 1200];
     let lastError: unknown = null;
     for (let attempt = 0; attempt < attemptDelaysMs.length; attempt += 1) {
@@ -1006,80 +1048,86 @@ export async function callAiWithPrompt(prompt: string) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), effectiveTimeoutMs);
       try {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            Accept: useStream ? "text/event-stream, application/json" : "application/json",
-            "Content-Type": "application/json",
-            Authorization: setting.api_key
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            model,
-            messages: [
-              {
-                role: "user",
-                content: prompt
+        const callOnce = async (previousAssistant: string | null) => {
+          const messages = buildMessages(prompt, previousAssistant);
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              Accept: useStream
+                ? "text/event-stream, application/json"
+                : "application/json",
+              "Content-Type": "application/json",
+              Authorization: setting.api_key
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              model,
+              messages,
+              max_tokens: effectiveMaxTokens,
+              stream: useStream
+            })
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            try {
+              const data = JSON.parse(text) as any;
+              const msg =
+                data?.error?.message_zh ||
+                data?.error?.message ||
+                data?.message_zh ||
+                data?.message;
+              if (typeof msg === "string" && msg.trim()) {
+                throw new Error(`${msg.trim()}（当前模型：${model}）`);
               }
-            ],
-            max_tokens: effectiveMaxTokens,
-            stream: useStream
-          })
-        });
-        if (!response.ok) {
-          const text = await response.text();
-          try {
-            const data = JSON.parse(text) as any;
-            const msg =
-              data?.error?.message_zh ||
-              data?.error?.message ||
-              data?.message_zh ||
-              data?.message;
-            if (typeof msg === "string" && msg.trim()) {
-              throw new Error(`${msg.trim()}（当前模型：${model}）`);
+            } catch {
             }
-          } catch {
+            throw new Error(
+              text ||
+                `调用 AI 接口失败，状态码：${response.status.toString()}（当前模型：${model}）`
+            );
           }
-          throw new Error(
-            text || `调用 AI 接口失败，状态码：${response.status.toString()}（当前模型：${model}）`
-          );
-        }
-        const contentType = response.headers.get("content-type") ?? "";
-        if (useStream && contentType.includes("text/event-stream")) {
-          const fallbackResponse = response.clone();
-          const streamed = await readEventStreamContent(response);
-          if (streamed && typeof streamed === "string") {
-            return streamed;
-          }
-          const fallbackText = await fallbackResponse.text();
-          const extracted = extractEventStreamContent(fallbackText);
-          if (extracted && typeof extracted === "string") {
-            return extracted;
-          }
-          try {
-            const data = JSON.parse(fallbackText) as any;
-            const content =
-              data?.choices?.[0]?.message?.content ??
-              data?.choices?.[0]?.delta?.content;
-            if (content && typeof content === "string") {
-              return content;
+          const contentType = response.headers.get("content-type") ?? "";
+          if (useStream && contentType.includes("text/event-stream")) {
+            const fallbackResponse = response.clone();
+            const streamed = await readEventStreamContent(response);
+            if (streamed && typeof streamed === "string") {
+              return { content: streamed, finishReason: null as any };
             }
-          } catch {
+            const fallbackText = await fallbackResponse.text();
+            const extracted = extractEventStreamContent(fallbackText);
+            if (extracted && typeof extracted === "string") {
+              return { content: extracted, finishReason: null as any };
+            }
+            const parsed = parseChatCompletionContent(fallbackText);
+            if (parsed.content) {
+              return parsed;
+            }
+            return { content: fallbackText, finishReason: null as any };
           }
-          return fallbackText;
-        }
-        const bodyText = await response.text();
-        try {
-          const data = JSON.parse(bodyText) as any;
-          const content =
-            data?.choices?.[0]?.message?.content ??
-            data?.choices?.[0]?.delta?.content;
-          if (content && typeof content === "string") {
-            return content;
+          const bodyText = await response.text();
+          const parsed = parseChatCompletionContent(bodyText);
+          if (parsed.content) {
+            return parsed;
           }
-        } catch {
+          return { content: bodyText, finishReason: null as any };
+        };
+
+        const first = await callOnce(null);
+        if (useStream) {
+          return first.content;
         }
-        return bodyText;
+
+        let fullContent = first.content;
+        let finishReason = first.finishReason;
+        for (let i = 0; i < 2; i += 1) {
+          if (finishReason !== "length") break;
+          if (!fullContent.trim()) break;
+          const next = await callOnce(fullContent);
+          if (!next.content) break;
+          fullContent = fullContent + "\n" + next.content;
+          finishReason = next.finishReason;
+        }
+        return fullContent;
       } catch (error) {
         lastError = error;
         if (isAbortError(error)) {
