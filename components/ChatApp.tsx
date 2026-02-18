@@ -698,7 +698,8 @@ export default function ChatApp(props: Props) {
     async (conversationId: number, assistantMessageId: number) => {
       setAiGenerating(true);
       const startedAt = Date.now();
-      while (Date.now() - startedAt < 5 * 60 * 1000) {
+      const maxPollMs = 12 * 60 * 1000;
+      while (Date.now() - startedAt < maxPollMs) {
         await new Promise<void>((resolve) => {
           setTimeout(resolve, 1500);
         });
@@ -730,6 +731,26 @@ export default function ChatApp(props: Props) {
         }
       }
       setAiGenerating(false);
+      if (currentConversationId !== conversationId) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/conversations/${conversationId}/messages`);
+        if (!res.ok) {
+          setError("生成超时，请刷新页面重试");
+          return;
+        }
+        const data: Message[] = await res.json();
+        setMessages(data);
+        const target = data.find((m) => m.id === assistantMessageId);
+        if (target && typeof target.content === "string") {
+          if (target.content.trim() && !target.content.includes("正在生成")) {
+            return;
+          }
+        }
+      } catch {
+      }
+      setError("生成超时，请刷新页面重试");
     },
     [currentConversationId]
   );
