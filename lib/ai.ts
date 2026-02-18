@@ -971,6 +971,30 @@ export async function callAiWithPrompt(prompt: string) {
     return output;
   };
 
+  const extractEventStreamContent = (text: string) => {
+    const lines = text.split(/\r?\n/);
+    let output = "";
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice("data:".length).trim();
+      if (!data) continue;
+      if (data === "[DONE]") break;
+      try {
+        const parsed = JSON.parse(data) as any;
+        const delta =
+          parsed?.choices?.[0]?.delta?.content ??
+          parsed?.choices?.[0]?.message?.content ??
+          "";
+        if (typeof delta === "string") {
+          output += delta;
+        }
+      } catch {
+      }
+    }
+    return output;
+  };
+
   try {
     const attemptDelaysMs = [0, 400, 1200];
     let lastError: unknown = null;
@@ -1022,10 +1046,27 @@ export async function callAiWithPrompt(prompt: string) {
         }
         const contentType = response.headers.get("content-type") ?? "";
         if (useStream && contentType.includes("text/event-stream")) {
+          const fallbackResponse = response.clone();
           const streamed = await readEventStreamContent(response);
           if (streamed && typeof streamed === "string") {
             return streamed;
           }
+          const fallbackText = await fallbackResponse.text();
+          const extracted = extractEventStreamContent(fallbackText);
+          if (extracted && typeof extracted === "string") {
+            return extracted;
+          }
+          try {
+            const data = JSON.parse(fallbackText) as any;
+            const content =
+              data?.choices?.[0]?.message?.content ??
+              data?.choices?.[0]?.delta?.content;
+            if (content && typeof content === "string") {
+              return content;
+            }
+          } catch {
+          }
+          return fallbackText;
         }
         const bodyText = await response.text();
         try {
