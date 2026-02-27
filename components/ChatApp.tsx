@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
@@ -196,6 +196,11 @@ function stripMarkdown(text: string) {
 export default function ChatApp(props: Props) {
   const { user, agents, initialConversations } = props;
 
+  const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+  const lastAssistantContentRef = useRef<HTMLDivElement | null>(null);
+  const lastAutoScrollConversationIdRef = useRef<number | null>(null);
+  const activePollConversationIdRef = useRef<number | null>(null);
+
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -248,7 +253,10 @@ export default function ChatApp(props: Props) {
     currentLesson?: string;
     currentLessonOutline?: string;
   } | null>(null);
-  const [aiGenerating, setAiGenerating] = useState(false);
+  const [generatingConversationId, setGeneratingConversationId] = useState<
+    number | null
+  >(null);
+  const currentConversationIdRef = useRef<number | null>(null);
 
   const getErrorMessage = useCallback((e: any, fallback: string) => {
     if (e && typeof e.message === "string") {
@@ -259,6 +267,10 @@ export default function ChatApp(props: Props) {
     }
     return fallback;
   }, []);
+
+  useEffect(() => {
+    currentConversationIdRef.current = currentConversationId;
+  }, [currentConversationId]);
 
   const currentConversation = useMemo(
     () => conversations.find((c) => c.id === currentConversationId) ?? null,
@@ -399,7 +411,6 @@ export default function ChatApp(props: Props) {
   useEffect(() => {
     if (!currentConversationId) {
       setLoadingMessages(false);
-      setAiGenerating(false);
       return;
     }
 
@@ -428,6 +439,18 @@ export default function ChatApp(props: Props) {
         }
         const data: Message[] = await res.json();
         setMessages(data);
+        const lastAssistant = [...data]
+          .reverse()
+          .find((message) => message.role === "assistant");
+        const pending =
+          !!lastAssistant &&
+          typeof lastAssistant.content === "string" &&
+          lastAssistant.content.includes("正在生成");
+        setGeneratingConversationId((prev) => {
+          if (pending) return currentConversationId;
+          if (prev === currentConversationId) return null;
+          return prev;
+        });
       } catch (e: any) {
         if (e?.name === "AbortError") {
           if (isTimeout) {
@@ -696,63 +719,83 @@ export default function ChatApp(props: Props) {
 
   const pollConversationMessages = useCallback(
     async (conversationId: number, assistantMessageId: number) => {
-      setAiGenerating(true);
+      if (activePollConversationIdRef.current === conversationId) return;
+      activePollConversationIdRef.current = conversationId;
+      setGeneratingConversationId(conversationId);
       const startedAt = Date.now();
       const maxPollMs = 12 * 60 * 1000;
-      while (Date.now() - startedAt < maxPollMs) {
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 1500);
-        });
-        if (currentConversationId !== conversationId) {
-          setAiGenerating(false);
+      try {
+        while (Date.now() - startedAt < maxPollMs) {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, 1500);
+          });
+          if (currentConversationIdRef.current !== conversationId) {
+            return;
+          }
+          try {
+            const res = await fetch(
+              `/api/conversations/${conversationId}/messages`
+            );
+            if (!res.ok) {
+              return;
+            }
+            const data: Message[] = await res.json();
+            if (currentConversationIdRef.current !== conversationId) {
+              return;
+            }
+            setMessages(data);
+            const target = data.find((m) => m.id === assistantMessageId);
+            if (!target) {
+              continue;
+            }
+            if (typeof target.content === "string" && target.content.trim()) {
+              if (!target.content.includes("正在生成")) {
+                setGeneratingConversationId((prev) =>
+                  prev === conversationId ? null : prev
+                );
+                return;
+              }
+            }
+          } catch {
+            return;
+          }
+        }
+
+        if (currentConversationIdRef.current !== conversationId) {
           return;
         }
         try {
-          const res = await fetch(`/api/conversations/${conversationId}/messages`);
+          const res = await fetch(
+            `/api/conversations/${conversationId}/messages`
+          );
           if (!res.ok) {
-            setAiGenerating(false);
+            setError("生成超时，请刷新页面重试");
             return;
           }
           const data: Message[] = await res.json();
+          if (currentConversationIdRef.current !== conversationId) {
+            return;
+          }
           setMessages(data);
           const target = data.find((m) => m.id === assistantMessageId);
-          if (!target) {
-            continue;
-          }
-          if (typeof target.content === "string" && target.content.trim()) {
-            if (!target.content.includes("正在生成")) {
-              setAiGenerating(false);
+          if (target && typeof target.content === "string") {
+            if (target.content.trim() && !target.content.includes("正在生成")) {
+              setGeneratingConversationId((prev) =>
+                prev === conversationId ? null : prev
+              );
               return;
             }
           }
         } catch {
-          setAiGenerating(false);
-          return;
+        }
+        setError("生成超时，请刷新页面重试");
+      } finally {
+        if (activePollConversationIdRef.current === conversationId) {
+          activePollConversationIdRef.current = null;
         }
       }
-      setAiGenerating(false);
-      if (currentConversationId !== conversationId) {
-        return;
-      }
-      try {
-        const res = await fetch(`/api/conversations/${conversationId}/messages`);
-        if (!res.ok) {
-          setError("生成超时，请刷新页面重试");
-          return;
-        }
-        const data: Message[] = await res.json();
-        setMessages(data);
-        const target = data.find((m) => m.id === assistantMessageId);
-        if (target && typeof target.content === "string") {
-          if (target.content.trim() && !target.content.includes("正在生成")) {
-            return;
-          }
-        }
-      } catch {
-      }
-      setError("生成超时，请刷新页面重试");
     },
-    [currentConversationId]
+    []
   );
 
   const handleSend = async () => {
@@ -837,7 +880,13 @@ export default function ChatApp(props: Props) {
       const aiReply: Message | null = data.aiReply ?? null;
       const prompt: string | null = data.aiPrompt ?? null;
       const aiReplyPending: boolean = data.aiReplyPending === true;
-      setAiGenerating(aiReplyPending);
+      if (aiReplyPending) {
+        setGeneratingConversationId(conversationId);
+      } else {
+        setGeneratingConversationId((prev) =>
+          prev === conversationId ? null : prev
+        );
+      }
       setMessages((prev) => {
         const replaced = prev.map((m) => (m.id === tempId ? message : m));
         return aiReply ? [...replaced, aiReply] : replaced;
@@ -1030,6 +1079,52 @@ export default function ChatApp(props: Props) {
       .find((message) => message.role === "assistant");
     return last?.id ?? null;
   }, [messages]);
+
+  useEffect(() => {
+    if (!currentConversationId) return;
+    if (loadingMessages) return;
+    if (messages.length === 0) return;
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((message) => message.role === "assistant");
+    if (!lastAssistant) {
+      setGeneratingConversationId((prev) =>
+        prev === currentConversationId ? null : prev
+      );
+      return;
+    }
+    const pending =
+      typeof lastAssistant.content === "string" &&
+      lastAssistant.content.includes("正在生成");
+    if (!pending) {
+      setGeneratingConversationId((prev) =>
+        prev === currentConversationId ? null : prev
+      );
+      return;
+    }
+    setGeneratingConversationId(currentConversationId);
+    void pollConversationMessages(currentConversationId, lastAssistant.id);
+  }, [currentConversationId, loadingMessages, messages, pollConversationMessages]);
+
+  useEffect(() => {
+    lastAssistantContentRef.current = null;
+  }, [currentConversationId]);
+
+  useEffect(() => {
+    if (!currentConversationId) return;
+    if (loadingMessages) return;
+    if (messages.length === 0) return;
+    if (lastAutoScrollConversationIdRef.current === currentConversationId) return;
+
+    lastAutoScrollConversationIdRef.current = currentConversationId;
+    requestAnimationFrame(() => {
+      bottomAnchorRef.current?.scrollIntoView({ block: "end" });
+      if (lastAssistantContentRef.current) {
+        lastAssistantContentRef.current.scrollTop =
+          lastAssistantContentRef.current.scrollHeight;
+      }
+    });
+  }, [currentConversationId, loadingMessages, messages.length]);
 
   const handleLogout = async () => {
     await signOut({ redirect: false });
@@ -1572,7 +1667,7 @@ export default function ChatApp(props: Props) {
                 {error}
               </div>
             ) : null}
-            {aiGenerating ? (
+            {generatingConversationId === currentConversationId ? (
               <div className="mb-3 rounded bg-sky-50 px-3 py-2 text-xs text-sky-700">
                 任务已提交，正在生成结果，请稍候...
               </div>
@@ -1604,6 +1699,11 @@ export default function ChatApp(props: Props) {
                   >
                     <div className="space-y-1">
                       <div
+                        ref={(node) => {
+                          if (message.id === lastAssistantId) {
+                            lastAssistantContentRef.current = node;
+                          }
+                        }}
                         className={`max-h-[70vh] max-w-full overflow-y-scroll rounded px-3 py-2 text-sm md:max-w-2xl custom-scrollbar ${
                           message.role === "user"
                             ? "bg-primary text-white"
@@ -1668,6 +1768,7 @@ export default function ChatApp(props: Props) {
                   </div>
                 );
               })}
+              <div ref={bottomAnchorRef} />
             </div>
           </div>
 
@@ -1676,7 +1777,9 @@ export default function ChatApp(props: Props) {
               <span>Enter 发送，Shift+Enter 换行</span>
               <div className="flex items-center gap-3">
                 {sending ? <span>发送中...</span> : null}
-                {!sending && aiGenerating ? <span>已提交，生成中...</span> : null}
+                {!sending && generatingConversationId === currentConversationId ? (
+                  <span>已提交，生成中...</span>
+                ) : null}
                 {(currentAgent?.slug === "positioning-helper" ||
                   currentAgent?.slug === "four-things" ||
                   currentAgent?.slug === "nine-grid" ||
@@ -1708,7 +1811,11 @@ export default function ChatApp(props: Props) {
             />
             <div className="mt-2 flex items-center justify-between">
               <div className="text-xs text-slate-500">
-                {sending ? "正在发送..." : aiGenerating ? "已提交，正在生成回复..." : ""}
+                {sending
+                  ? "正在发送..."
+                  : generatingConversationId === currentConversationId
+                    ? "已提交，正在生成回复..."
+                    : ""}
               </div>
               <div className="flex items-center gap-2">
                 {sending ? (
@@ -1725,10 +1832,16 @@ export default function ChatApp(props: Props) {
                   className="rounded bg-primary px-4 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
                   onClick={handleSend}
                   disabled={
-                    sending || aiGenerating || !currentInput.trim()
+                    sending ||
+                    generatingConversationId === currentConversationId ||
+                    !currentInput.trim()
                   }
                 >
-                  {sending ? "发送中..." : aiGenerating ? "生成中..." : "发送"}
+                  {sending
+                    ? "发送中..."
+                    : generatingConversationId === currentConversationId
+                      ? "生成中..."
+                      : "发送"}
                 </button>
               </div>
             </div>
