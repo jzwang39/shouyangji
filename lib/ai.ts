@@ -868,7 +868,14 @@ export function buildCourseTranscriptPrompt(content: string) {
 结果控制在8000个字左右。`;
 }
 
-export async function callAiWithPrompt(prompt: string) {
+type CallAiWithPromptOptions = {
+  onDelta?: (delta: string) => void | Promise<void>;
+};
+
+export async function callAiWithPrompt(
+  prompt: string,
+  options: CallAiWithPromptOptions = {}
+) {
   const rows = await query<AiSettings>(
     "SELECT model_name, api_key FROM ai_settings ORDER BY id DESC LIMIT 1"
   );
@@ -892,9 +899,7 @@ export async function callAiWithPrompt(prompt: string) {
   const rawMaxTokens = process.env.AI_MAX_TOKENS;
   const maxTokens = rawMaxTokens ? Number(rawMaxTokens) : 8192;
   const effectiveMaxTokens = Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 200000;
-  const useStream =
-    (process.env.AI_STREAM ??
-      (process.env.NODE_ENV === "production" ? "0" : "1")) !== "0";
+  const useStream = true;
 
   const isAbortError = (error: unknown) => {
     return (
@@ -965,6 +970,9 @@ export async function callAiWithPrompt(prompt: string) {
             "";
           if (typeof delta === "string") {
             output += delta;
+            if (delta && options.onDelta) {
+              await options.onDelta(delta);
+            }
           }
         } catch {
         }
@@ -1064,7 +1072,7 @@ export async function callAiWithPrompt(prompt: string) {
               model,
               messages,
               max_tokens: effectiveMaxTokens,
-              stream: useStream
+              stream: true
             })
           });
           if (!response.ok) {

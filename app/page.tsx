@@ -25,7 +25,7 @@ export default function HomePage() {
             AI
           </div>
           <div className="leading-tight">
-            <div className="text-4xl font-semibold text-slate-900">
+            <div className="text-base font-semibold text-slate-900">
               策划大师
             </div>
             <div className="text-xs text-slate-500">多智能体 · 知识工作流</div>
@@ -44,7 +44,7 @@ export default function HomePage() {
       <main className="mx-auto w-full max-w-6xl px-6 pb-12 pt-10">
         <div className="grid items-center gap-10 md:grid-cols-2">
           <div>
-            <h1 className="text-balance text-4xl font-bold tracking-tight text-slate-900 md:text-6xl">
+            <h1 className="text-balance text-4xl font-semibold leading-tight text-slate-900 md:text-5xl">
               更快地写作、规划与产出
             </h1>
             <p className="mt-5 text-pretty text-base leading-relaxed text-slate-600 md:text-lg">
@@ -59,6 +59,12 @@ export default function HomePage() {
               >
                 开始使用
               </button>
+              <a
+                href="/chat"
+                className="inline-flex items-center justify-center rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-black/5 hover:bg-slate-50"
+              >
+                直接进入
+              </a>
             </div>
 
             <div className="mt-10 grid grid-cols-2 gap-4 text-sm text-slate-600">
@@ -124,8 +130,16 @@ export default function HomePage() {
           </div>
         </div>
 
-        <footer className="mx-auto mt-14 flex w-full max-w-6xl items-center border-t border-black/5 px-0 pt-6 text-xs text-slate-500">
+        <footer className="mx-auto mt-14 flex w-full max-w-6xl items-center justify-between border-t border-black/5 px-0 pt-6 text-xs text-slate-500">
           <div>© {year} 策划大师</div>
+          <div className="flex items-center gap-4">
+            <a href="/reset-password" className="hover:text-slate-700">
+              忘记密码
+            </a>
+            <a href="/login" className="hover:text-slate-700">
+              登录页面
+            </a>
+          </div>
         </footer>
       </main>
 

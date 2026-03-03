@@ -193,6 +193,15 @@ function stripMarkdown(text: string) {
     .replace(/_(.*?)_/g, "$1");
 }
 
+const PENDING_PREFIX = "正在生成，请稍候...";
+
+function stripPendingPrefix(text: string) {
+  const normalized = String(text ?? "").replace(/\r\n/g, "\n");
+  if (!normalized.startsWith(PENDING_PREFIX)) return String(text ?? "");
+  const rest = normalized.slice(PENDING_PREFIX.length).replace(/^\s+/, "");
+  return rest ? rest : PENDING_PREFIX;
+}
+
 export default function ChatApp(props: Props) {
   const { user, agents, initialConversations } = props;
 
@@ -843,8 +852,11 @@ export default function ChatApp(props: Props) {
         `/api/conversations/${conversationId}/messages`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content })
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream"
+          },
+          body: JSON.stringify({ content, stream: true })
         }
       );
       if (!res.ok) {
@@ -871,31 +883,150 @@ export default function ChatApp(props: Props) {
         const message = safeDetails || `发送失败（HTTP ${res.status}${hint ? `：${hint}` : ""}）`;
         throw new Error(message);
       }
-      setCurrentInput("");
       setDrafts((prev) =>
         conversationId ? { ...prev, [conversationId]: "" } : prev
       );
-      const data = await res.json();
-      const message: Message = data.message;
-      const aiReply: Message | null = data.aiReply ?? null;
-      const prompt: string | null = data.aiPrompt ?? null;
-      const aiReplyPending: boolean = data.aiReplyPending === true;
-      if (aiReplyPending) {
+
+      const contentType = res.headers.get("content-type") ?? "";
+      if (contentType.includes("text/event-stream")) {
         setGeneratingConversationId(conversationId);
-      } else {
+        const reader = res.body?.getReader();
+        if (!reader) {
+          throw new Error("流式响应不可读");
+        }
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let assistantId: number | null = null;
+
+        const handlePayload = (payload: any) => {
+          if (!payload || typeof payload !== "object") return;
+          if (payload.type === "meta") {
+            const serverMessage: Message = payload.message;
+            const aiReply: Message | null = payload.aiReply ?? null;
+            const promptText: string | null = payload.aiPrompt ?? null;
+            if (aiReply) {
+              assistantId = aiReply.id;
+            }
+            setMessages((prev) => {
+              const replaced = prev.map((m) =>
+                m.id === tempId ? serverMessage : m
+              );
+              if (!aiReply) return replaced;
+              return [...replaced, { ...aiReply, content: PENDING_PREFIX }];
+            });
+            if (aiReply && promptText) {
+              setAiPrompts((prev) => ({ ...prev, [aiReply.id]: promptText }));
+            }
+            return;
+          }
+          if (payload.type === "delta") {
+            const delta = typeof payload.delta === "string" ? payload.delta : "";
+            if (!delta) return;
+            if (!assistantId) return;
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.id !== assistantId) return m;
+                const prevContent = typeof m.content === "string" ? m.content : "";
+                return { ...m, content: prevContent + delta };
+              })
+            );
+            return;
+          }
+          if (payload.type === "final") {
+            const text =
+              typeof payload.content === "string" ? payload.content : "";
+            if (!assistantId || !text) return;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantId ? { ...m, content: text } : m))
+            );
+            return;
+          }
+          if (payload.type === "error") {
+            const text = typeof payload.message === "string" ? payload.message : "";
+            if (assistantId && text) {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, content: text } : m))
+              );
+            }
+            return;
+          }
+        };
+
+        const consumeSseText = (text: string, force: boolean) => {
+          let local = text;
+          while (true) {
+            const index = local.indexOf("\n\n");
+            if (index === -1) break;
+            const rawEvent = local.slice(0, index);
+            local = local.slice(index + 2);
+            const lines = rawEvent.split(/\r?\n/);
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith("data:")) continue;
+              const data = trimmed.slice("data:".length).trim();
+              if (!data) continue;
+              try {
+                const payload = JSON.parse(data);
+                handlePayload(payload);
+              } catch {
+              }
+            }
+          }
+          if (force) {
+            const rawEvent = local.trim();
+            if (rawEvent) {
+              const lines = rawEvent.split(/\r?\n/);
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith("data:")) continue;
+                const data = trimmed.slice("data:".length).trim();
+                if (!data) continue;
+                try {
+                  const payload = JSON.parse(data);
+                  handlePayload(payload);
+                } catch {
+                }
+              }
+            }
+            return "";
+          }
+          return local;
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          buffer = consumeSseText(buffer, false);
+        }
+        consumeSseText(buffer, true);
+
         setGeneratingConversationId((prev) =>
           prev === conversationId ? null : prev
         );
-      }
-      setMessages((prev) => {
-        const replaced = prev.map((m) => (m.id === tempId ? message : m));
-        return aiReply ? [...replaced, aiReply] : replaced;
-      });
-      if (aiReply && prompt) {
-        setAiPrompts((prev) => ({ ...prev, [aiReply.id]: prompt }));
-      }
-      if (aiReply && aiReplyPending) {
-        void pollConversationMessages(conversationId, aiReply.id);
+      } else {
+        const data = await res.json();
+        const message: Message = data.message;
+        const aiReply: Message | null = data.aiReply ?? null;
+        const prompt: string | null = data.aiPrompt ?? null;
+        const aiReplyPending: boolean = data.aiReplyPending === true;
+        if (aiReplyPending) {
+          setGeneratingConversationId(conversationId);
+        } else {
+          setGeneratingConversationId((prev) =>
+            prev === conversationId ? null : prev
+          );
+        }
+        setMessages((prev) => {
+          const replaced = prev.map((m) => (m.id === tempId ? message : m));
+          return aiReply ? [...replaced, aiReply] : replaced;
+        });
+        if (aiReply && prompt) {
+          setAiPrompts((prev) => ({ ...prev, [aiReply.id]: prompt }));
+        }
+        if (aiReply && aiReplyPending) {
+          void pollConversationMessages(conversationId, aiReply.id);
+        }
       }
       setConversations((prev) =>
         prev.map((conversation) => {
@@ -1039,7 +1170,7 @@ export default function ChatApp(props: Props) {
 
   const handleCopy = async (message: Message) => {
     try {
-      const text = stripMarkdown(message.content);
+      const text = stripMarkdown(stripPendingPrefix(message.content));
       await navigator.clipboard.writeText(text);
       await fetch("/api/operations/log", {
         method: "POST",
@@ -1084,6 +1215,7 @@ export default function ChatApp(props: Props) {
     if (!currentConversationId) return;
     if (loadingMessages) return;
     if (messages.length === 0) return;
+    if (generatingConversationId === currentConversationId) return;
     const lastAssistant = [...messages]
       .reverse()
       .find((message) => message.role === "assistant");
@@ -1104,7 +1236,13 @@ export default function ChatApp(props: Props) {
     }
     setGeneratingConversationId(currentConversationId);
     void pollConversationMessages(currentConversationId, lastAssistant.id);
-  }, [currentConversationId, loadingMessages, messages, pollConversationMessages]);
+  }, [
+    currentConversationId,
+    generatingConversationId,
+    loadingMessages,
+    messages,
+    pollConversationMessages
+  ]);
 
   useEffect(() => {
     lastAssistantContentRef.current = null;
@@ -1156,7 +1294,7 @@ export default function ChatApp(props: Props) {
         productName: "",
         agentName: agentDisplayName,
         lessonCount: "0",
-        resultContent: message.content,
+        resultContent: stripPendingPrefix(message.content),
         createdAt: nowIso,
         updatedAt: nowIso
       });
@@ -1688,6 +1826,11 @@ export default function ChatApp(props: Props) {
                 const prompt =
                   message.role === "assistant" ? aiPrompts[message.id] : null;
                 const showPromptToggle = devMode && !!prompt;
+                const displayedContent =
+                  message.role === "assistant" &&
+                  typeof message.content === "string"
+                    ? stripPendingPrefix(message.content)
+                    : message.content;
                 return (
                   <div
                     key={message.id}
@@ -1750,7 +1893,7 @@ export default function ChatApp(props: Props) {
                         </div>
                         <div className="prose prose-sm max-w-none">
                           <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
-                            {message.content}
+                            {displayedContent}
                           </ReactMarkdown>
                         </div>
                       </div>

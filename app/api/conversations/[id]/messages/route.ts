@@ -44,6 +44,9 @@ export async function POST(request: Request, context: Params) {
     const conversationId = Number(context.params.id);
     const body = await request.json();
     const content = String(body.content ?? "").trim();
+    const wantsStream =
+      body?.stream === true ||
+      (request.headers.get("accept") ?? "").includes("text/event-stream");
     if (!content) {
       return new NextResponse("content is required", { status: 400 });
     }
@@ -110,9 +113,10 @@ export async function POST(request: Request, context: Params) {
     if (aiAgents.has(conversation.slug)) {
       const prompt = await buildPromptForAgent(conversation.slug, content);
       aiPrompt = prompt;
+      const pendingPrefix = "正在生成，请稍候...";
       const aiResult: any = await query(
         "INSERT INTO messages (conversation_id, role, content) VALUES (?, 'assistant', ?)",
-        [conversationId, "正在生成，请稍候..."]
+        [conversationId, pendingPrefix]
       );
       const aiMessageId = aiResult.insertId as number;
       const [aiMessage] = await query(
@@ -120,6 +124,129 @@ export async function POST(request: Request, context: Params) {
         [aiMessageId]
       );
       aiReply = aiMessage;
+
+      if (wantsStream) {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            const send = (payload: unknown) => {
+              try {
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)
+                );
+              } catch {
+              }
+            };
+
+            send({
+              type: "meta",
+              message,
+              aiReply,
+              aiPrompt,
+              aiReplyPending: true
+            });
+
+            void (async () => {
+              let fullText = "";
+              let isError = false;
+              let lastPersistAt = 0;
+
+              const persist = async (force: boolean) => {
+                const now = Date.now();
+                if (!force && now - lastPersistAt < 900) return;
+                lastPersistAt = now;
+                const dbContent = `${pendingPrefix}\n\n${fullText}`;
+                await query(
+                  "UPDATE messages SET content = ?, updated_at = NOW() WHERE id = ?",
+                  [dbContent, aiMessageId]
+                );
+              };
+
+              try {
+                const final = await callAiWithPrompt(prompt, {
+                  onDelta: async (delta) => {
+                    if (!delta) return;
+                    fullText += delta;
+                    send({ type: "delta", delta });
+                    await persist(false);
+                  }
+                });
+
+                const finalText = typeof final === "string" ? final : "";
+                if (finalText && finalText !== fullText) {
+                  fullText = finalText;
+                }
+                send({ type: "final", content: fullText });
+
+                await query(
+                  "UPDATE messages SET content = ?, updated_at = NOW() WHERE id = ?",
+                  [fullText, aiMessageId]
+                );
+              } catch (e: any) {
+                let message = "";
+                if (typeof e?.message === "string" && e.message) {
+                  message = e.message;
+                }
+                const extra: string[] = [];
+                if (e?.name && typeof e.name === "string" && e.name !== "Error") {
+                  extra.push(`错误类型: ${e.name}`);
+                }
+                if (e?.cause) {
+                  let causeText = "";
+                  if (typeof e.cause === "string") {
+                    causeText = e.cause;
+                  } else {
+                    try {
+                      causeText = JSON.stringify(e.cause);
+                    } catch {
+                      causeText = String(e.cause);
+                    }
+                  }
+                  if (causeText) {
+                    extra.push(`详细原因: ${causeText}`);
+                  }
+                }
+                if (!message) {
+                  message = "调用 AI 接口失败，请稍后重试";
+                }
+                if (extra.length) {
+                  message = `${message}\n${extra.join("\n")}`;
+                }
+                fullText = `【系统提示】${message}`;
+                isError = true;
+                await query(
+                  "UPDATE messages SET content = ?, updated_at = NOW() WHERE id = ?",
+                  [fullText, aiMessageId]
+                );
+                send({ type: "error", message: fullText });
+              } finally {
+                await logOperation({
+                  userId,
+                  action: isError ? "ai_error" : "ai_reply",
+                  targetType: "message",
+                  targetId: aiMessageId,
+                  metadata: {
+                    conversationId,
+                    agentSlug: conversation.slug,
+                    prompt
+                  }
+                });
+                send({ type: "done" });
+                controller.close();
+              }
+            })();
+          }
+        });
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no"
+          }
+        });
+      }
 
       void (async () => {
         let aiText = "";
