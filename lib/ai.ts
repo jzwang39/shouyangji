@@ -943,11 +943,12 @@ export async function callAiWithPrompt(
   };
 
   const readEventStreamContent = async (response: Response) => {
-    if (!response.body) return "";
+    if (!response.body) return { content: "", finishReason: null };
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let output = "";
+    let finishReason: string | null = null;
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -961,13 +962,17 @@ export async function callAiWithPrompt(
         if (!line.startsWith("data:")) continue;
         const data = line.slice("data:".length).trim();
         if (!data) continue;
-        if (data === "[DONE]") return output;
+        if (data === "[DONE]") return { content: output, finishReason };
         try {
           const parsed = JSON.parse(data) as any;
+          const choice = parsed?.choices?.[0];
           const delta =
-            parsed?.choices?.[0]?.delta?.content ??
-            parsed?.choices?.[0]?.message?.content ??
+            choice?.delta?.content ??
+            choice?.message?.content ??
             "";
+          if (choice?.finish_reason) {
+            finishReason = choice.finish_reason;
+          }
           if (typeof delta === "string") {
             output += delta;
             if (delta && options.onDelta) {
@@ -978,12 +983,13 @@ export async function callAiWithPrompt(
         }
       }
     }
-    return output;
+    return { content: output, finishReason };
   };
 
   const extractEventStreamContent = (text: string) => {
     const lines = text.split(/\r?\n/);
     let output = "";
+    let finishReason: string | null = null;
     for (const rawLine of lines) {
       const line = rawLine.trim();
       if (!line.startsWith("data:")) continue;
@@ -992,17 +998,21 @@ export async function callAiWithPrompt(
       if (data === "[DONE]") break;
       try {
         const parsed = JSON.parse(data) as any;
+        const choice = parsed?.choices?.[0];
         const delta =
-          parsed?.choices?.[0]?.delta?.content ??
-          parsed?.choices?.[0]?.message?.content ??
+          choice?.delta?.content ??
+          choice?.message?.content ??
           "";
+        if (choice?.finish_reason) {
+          finishReason = choice.finish_reason;
+        }
         if (typeof delta === "string") {
           output += delta;
         }
       } catch {
       }
     }
-    return output;
+    return { content: output, finishReason };
   };
 
   try {
@@ -1098,13 +1108,19 @@ export async function callAiWithPrompt(
           if (useStream && contentType.includes("text/event-stream")) {
             const fallbackResponse = response.clone();
             const streamed = await readEventStreamContent(response);
-            if (streamed && typeof streamed === "string") {
-              return { content: streamed, finishReason: null as any };
+            if (streamed && typeof streamed.content === "string") {
+              return {
+                content: streamed.content,
+                finishReason: streamed.finishReason
+              };
             }
             const fallbackText = await fallbackResponse.text();
             const extracted = extractEventStreamContent(fallbackText);
-            if (extracted && typeof extracted === "string") {
-              return { content: extracted, finishReason: null as any };
+            if (extracted && typeof extracted.content === "string") {
+              return {
+                content: extracted.content,
+                finishReason: extracted.finishReason
+              };
             }
             const parsed = parseChatCompletionContent(fallbackText);
             if (parsed.content) {
@@ -1121,9 +1137,6 @@ export async function callAiWithPrompt(
         };
 
         const first = await callOnce(null);
-        if (useStream) {
-          return first.content;
-        }
 
         let fullContent = first.content;
         let finishReason = first.finishReason;

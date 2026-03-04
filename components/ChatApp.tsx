@@ -256,6 +256,7 @@ export default function ChatApp(props: Props) {
   const [referenceForm, setReferenceForm] = useState<{
     productName: string;
     content: string;
+    positioningContent?: string;
     fourThingsContent?: string;
     nineGridContent?: string;
     courseOutlineContent?: string;
@@ -555,14 +556,17 @@ export default function ChatApp(props: Props) {
         if (!currentAgent) return;
         if (
           currentAgent.slug === "course-outline" ||
-          currentAgent.slug === "course-transcript"
+          currentAgent.slug === "course-transcript" ||
+          currentAgent.slug === "four-things" ||
+          currentAgent.slug === "nine-grid"
         ) {
           const queries: {
             key:
               | "content"
               | "fourThingsContent"
               | "nineGridContent"
-              | "courseOutlineContent";
+              | "courseOutlineContent"
+              | "positioningContent";
             agentName: string;
           }[] =
             currentAgent.slug === "course-outline"
@@ -571,11 +575,16 @@ export default function ChatApp(props: Props) {
                   { key: "fourThingsContent", agentName: "四件事" },
                   { key: "nineGridContent", agentName: "九宫格" }
                 ]
-              : [
+              : currentAgent.slug === "course-transcript"
+              ? [
                   { key: "content", agentName: "产品一页纸" },
                   { key: "fourThingsContent", agentName: "四件事" },
                   { key: "nineGridContent", agentName: "九宫格" },
                   { key: "courseOutlineContent", agentName: "课纲" }
+                ]
+              : [
+                  { key: "content", agentName: "产品一页纸" },
+                  { key: "positioningContent", agentName: "定位" }
                 ];
           const results = await Promise.all(
             queries.map(async ({ key, agentName }) => {
@@ -1800,6 +1809,7 @@ export default function ChatApp(props: Props) {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-scroll px-4 py-4 custom-scrollbar">
+            <div className="mx-auto w-full max-w-2xl">
             {error ? (
               <div className="mb-3 rounded bg-red-50 px-3 py-2 text-xs text-red-600">
                 {error}
@@ -1834,20 +1844,20 @@ export default function ChatApp(props: Props) {
                 return (
                   <div
                     key={message.id}
-                    className={`flex ${
+                    className={`flex w-full ${
                       message.role === "user"
                         ? "justify-end"
                         : "justify-start"
                     }`}
                   >
-                    <div className="space-y-1">
+                    <div className="w-full space-y-1">
                       <div
                         ref={(node) => {
                           if (message.id === lastAssistantId) {
                             lastAssistantContentRef.current = node;
                           }
                         }}
-                        className={`max-h-[70vh] max-w-full overflow-y-scroll rounded px-3 py-2 text-sm md:max-w-2xl custom-scrollbar ${
+                        className={`w-full max-h-[70vh] overflow-y-scroll rounded px-3 py-2 text-sm custom-scrollbar ${
                           message.role === "user"
                             ? "bg-primary text-white"
                             : "bg-slate-100 text-slate-900"
@@ -1898,7 +1908,7 @@ export default function ChatApp(props: Props) {
                         </div>
                       </div>
                       {showPromptToggle ? (
-                        <details className="max-w-[90vw] md:max-w-2xl">
+                        <details className="w-full">
                           <summary className="cursor-pointer text-[11px] text-slate-500 underline">
                             查看本次 prompt
                           </summary>
@@ -1913,9 +1923,11 @@ export default function ChatApp(props: Props) {
               })}
               <div ref={bottomAnchorRef} />
             </div>
+            </div>
           </div>
 
           <div className="border-t px-4 py-3">
+            <div className="mx-auto w-full max-w-2xl">
             <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500">
               <span>Enter 发送，Shift+Enter 换行</span>
               <div className="flex items-center gap-3">
@@ -1993,6 +2005,7 @@ export default function ChatApp(props: Props) {
                 请选择智能体并输入内容开始新的对话
               </div>
             ) : null}
+            </div>
           </div>
           {referenceDialogOpen && referenceForm ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -2230,22 +2243,47 @@ export default function ChatApp(props: Props) {
                       </div>
                     </>
                   ) : (
-                    <div>
-                      <label className="mb-1 block text-[11px] text-slate-600">
-                        产品一页纸结果内容
-                      </label>
-                      <textarea
-                        className="h-40 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                        value={referenceForm.content}
-                        onChange={(event) =>
-                          setReferenceForm((prev) =>
-                            prev
-                              ? { ...prev, content: event.target.value }
-                              : prev
-                          )
-                        }
-                      />
-                    </div>
+                    <>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-600">
+                          产品一页纸结果内容
+                        </label>
+                        <textarea
+                          className="h-40 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                          value={referenceForm.content}
+                          onChange={(event) =>
+                            setReferenceForm((prev) =>
+                              prev
+                                ? { ...prev, content: event.target.value }
+                                : prev
+                            )
+                          }
+                        />
+                      </div>
+                      {currentAgent &&
+                        (currentAgent.slug === "four-things" ||
+                          currentAgent.slug === "nine-grid") && (
+                        <div>
+                          <label className="mb-1 block text-[11px] text-slate-600">
+                            定位结果内容
+                          </label>
+                          <textarea
+                            className="h-40 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            value={referenceForm.positioningContent ?? ""}
+                            onChange={(event) =>
+                              setReferenceForm((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      positioningContent: event.target.value
+                                    }
+                                  : prev
+                              )
+                            }
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
@@ -2266,6 +2304,19 @@ export default function ChatApp(props: Props) {
                       if (referenceForm) {
                         let text = referenceForm.content;
                         if (currentAgent) {
+                          if (
+                            currentAgent.slug === "four-things" ||
+                            currentAgent.slug === "nine-grid"
+                          ) {
+                            const posContent = (
+                              referenceForm.positioningContent ?? ""
+                            ).trim();
+                            if (posContent) {
+                              text = text
+                                ? `${text}\n\n定位信息：\n${posContent}`
+                                : `定位信息：\n${posContent}`;
+                            }
+                          }
                           if (
                             currentAgent.slug === "course-outline" ||
                             currentAgent.slug === "course-transcript"
