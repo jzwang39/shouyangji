@@ -116,9 +116,44 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-## 5. 常见问题排查
+## 6. 更新部署（非首次部署）
 
-- **AI 请求超时**：检查 Nginx 的 `proxy_read_timeout` 是否设置足够长。
-- **数据库连接失败**：检查 ECS 安全组是否开放 3306 端口（如果是远程连接），或检查 `.env.local` 中的密码是否正确。
-- **页面 502 Bad Gateway**：检查 Node.js 服务是否启动 (`pm2 list`)。
+如果已经在服务器上部署过，只需执行以下步骤来更新代码：
+
+### 6.1 拉取最新代码
+进入项目目录并拉取 git 仓库的最新更改：
+```bash
+cd shouyangji-new
+git pull origin main
+```
+
+### 6.2 更新依赖与数据库
+安装可能新增的依赖包，并运行数据库迁移脚本（非常重要，本次更新包含新的数据库表结构）：
+```bash
+npm install
+npm run migrate
+```
+
+### 6.3 重新构建
+重新编译 Next.js 应用：
+```bash
+npm run build
+```
+
+### 6.4 重启服务
+使用 PM2 重载应用以应用更改：
+```bash
+pm2 reload ai-chat-app
+```
+或者：
+```bash
+pm2 restart ecosystem.config.js
+```
+
+### 6.5 (可选) 检查 Nginx 配置
+如果之前遇到过 AI 请求超时的问题，请确保 Nginx 配置中已增加了超时设置（参考第 4 节），修改后需重启 Nginx：
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
 
