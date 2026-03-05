@@ -244,6 +244,7 @@ function stripPendingPrefix(text: string) {
 }
 
 export default function ChatApp(props: Props) {
+  // Update timestamp: 2026-03-05 17:35
   const { user, agents, initialConversations } = props;
 
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
