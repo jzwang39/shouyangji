@@ -58,6 +58,15 @@ type AgentPromptRow = {
   systemPrompt: string;
 };
 
+type CourseRuleRow = {
+  id: number;
+  name: string;
+  lesson_count: number;
+  rule_content: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type Props = {
   currentUser: UserInfo;
   initialAiSetting: AiSetting;
@@ -70,7 +79,7 @@ export default function SettingsApp(props: Props) {
   const { currentUser, initialAiSetting, initialUsers, initialLogs, initialAgents } =
     props;
   const [tab, setTab] = useState<
-    "ai" | "users" | "logs" | "roles" | "theme" | "prompts"
+    "ai" | "users" | "logs" | "roles" | "theme" | "prompts" | "course-rules"
   >("users");
   const [aiSetting, setAiSetting] = useState<AiSetting>(initialAiSetting);
   const [modelName, setModelName] = useState(
@@ -120,6 +129,19 @@ export default function SettingsApp(props: Props) {
   const [loadingPrompts, setLoadingPrompts] = useState(false);
   const [savingPromptSlug, setSavingPromptSlug] = useState<string | null>(null);
 
+  const [courseRules, setCourseRules] = useState<CourseRuleRow[]>([]);
+  const [loadingCourseRules, setLoadingCourseRules] = useState(false);
+  const [creatingCourseRule, setCreatingCourseRule] = useState(false);
+  const [savingCourseRuleEdit, setSavingCourseRuleEdit] = useState(false);
+  const [newCourseRule, setNewCourseRule] = useState({
+    name: "",
+    lesson_count: 0,
+    rule_content: ""
+  });
+  const [editingCourseRule, setEditingCourseRule] = useState<CourseRuleRow | null>(
+    null
+  );
+
   useEffect(() => {
     const map: Record<number, Role> = {};
     for (const user of users) {
@@ -148,6 +170,80 @@ export default function SettingsApp(props: Props) {
     if (agentPrompts) return;
     reloadPrompts();
   }, [agentPrompts, currentUser.role, loadingPrompts, tab]);
+
+  useEffect(() => {
+    if (tab === "course-rules") {
+      reloadCourseRules();
+    }
+  }, [tab]);
+
+  const reloadCourseRules = async () => {
+    setLoadingCourseRules(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/course-rules");
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      const list: CourseRuleRow[] = await res.json();
+      setCourseRules(list);
+    } catch (e: any) {
+      setError(e.message ?? "加载课纲规则失败");
+    } finally {
+      setLoadingCourseRules(false);
+    }
+  };
+
+  const handleCreateCourseRule = async () => {
+    if (!newCourseRule.name || !newCourseRule.rule_content || newCourseRule.lesson_count <= 0) {
+      setError("请填写所有字段，课纲节数必须大于0");
+      return;
+    }
+    setCreatingCourseRule(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/course-rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newCourseRule)
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      setNewCourseRule({ name: "", lesson_count: 0, rule_content: "" });
+      await reloadCourseRules();
+    } catch (e: any) {
+      setError(e.message ?? "创建课纲规则失败");
+    } finally {
+      setCreatingCourseRule(false);
+    }
+  };
+
+  const handleSaveCourseRuleEdit = async () => {
+    if (!editingCourseRule) return;
+    if (!editingCourseRule.name || !editingCourseRule.rule_content || editingCourseRule.lesson_count <= 0) {
+      setError("请填写所有字段，课纲节数必须大于0");
+      return;
+    }
+    setSavingCourseRuleEdit(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/course-rules/${editingCourseRule.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingCourseRule)
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      setEditingCourseRule(null);
+      await reloadCourseRules();
+    } catch (e: any) {
+      setError(e.message ?? "更新课纲规则失败");
+    } finally {
+      setSavingCourseRuleEdit(false);
+    }
+  };
 
   const reloadRoles = async () => {
     setLoadingRoles(true);
@@ -547,6 +643,11 @@ export default function SettingsApp(props: Props) {
                   }
                 ]
               : []),
+            {
+              id: "course-rules",
+              label: "课纲规则设置",
+              icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+            },
             { id: "theme", label: "界面风格", icon: "M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" },
           ].map((item) => (
             <button
@@ -1212,6 +1313,141 @@ export default function SettingsApp(props: Props) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        ) : null}
+
+        {tab === "course-rules" ? (
+          <div className="space-y-6 text-xs">
+            <div className="rounded border border-slate-200 p-3">
+              <div className="mb-2 font-semibold">
+                {editingCourseRule ? "编辑课纲规则" : "增加课纲规则"}
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-[11px] text-slate-600">
+                    课纲规则名称
+                  </label>
+                  <input
+                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    value={editingCourseRule ? editingCourseRule.name : newCourseRule.name}
+                    onChange={(event) =>
+                      editingCourseRule
+                        ? setEditingCourseRule({ ...editingCourseRule, name: event.target.value })
+                        : setNewCourseRule({ ...newCourseRule, name: event.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-slate-600">
+                    课纲节数
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    value={editingCourseRule ? editingCourseRule.lesson_count : newCourseRule.lesson_count}
+                    onChange={(event) =>
+                      editingCourseRule
+                        ? setEditingCourseRule({ ...editingCourseRule, lesson_count: Number(event.target.value) })
+                        : setNewCourseRule({ ...newCourseRule, lesson_count: Number(event.target.value) })
+                    }
+                  />
+                </div>
+                <div className="md:col-span-3">
+                  <label className="mb-1 block text-[11px] text-slate-600">
+                    课纲规则字段数据
+                  </label>
+                  <textarea
+                    className="w-full h-32 rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary font-mono"
+                    value={editingCourseRule ? editingCourseRule.rule_content : newCourseRule.rule_content}
+                    onChange={(event) =>
+                      editingCourseRule
+                        ? setEditingCourseRule({ ...editingCourseRule, rule_content: event.target.value })
+                        : setNewCourseRule({ ...newCourseRule, rule_content: event.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  className="rounded bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                  disabled={creatingCourseRule || savingCourseRuleEdit}
+                  onClick={editingCourseRule ? handleSaveCourseRuleEdit : handleCreateCourseRule}
+                >
+                  {creatingCourseRule || savingCourseRuleEdit ? "保存中..." : editingCourseRule ? "保存修改" : "增加课纲规则"}
+                </button>
+                {editingCourseRule && (
+                  <button
+                    type="button"
+                    className="rounded border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                    onClick={() => setEditingCourseRule(null)}
+                  >
+                    取消修改
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 font-semibold">课纲规则列表</div>
+              <div className="overflow-x-auto rounded border border-slate-200">
+                <table className="min-w-full border-collapse text-[11px]">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="border-b px-2 py-1 text-left">ID</th>
+                      <th className="border-b px-2 py-1 text-left">名称</th>
+                      <th className="border-b px-2 py-1 text-left">节数</th>
+                      <th className="border-b px-2 py-1 text-left">规则数据</th>
+                      <th className="border-b px-2 py-1 text-left">创建时间</th>
+                      <th className="border-b px-2 py-1 text-left">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingCourseRules ? (
+                      <tr>
+                        <td colSpan={6} className="px-2 py-4 text-center text-slate-500">
+                          加载中...
+                        </td>
+                      </tr>
+                    ) : courseRules.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-2 py-4 text-center text-slate-500">
+                          暂无数据
+                        </td>
+                      </tr>
+                    ) : (
+                      courseRules.map((rule) => (
+                        <tr key={rule.id} className="odd:bg-white even:bg-slate-50">
+                          <td className="border-b px-2 py-1">{rule.id}</td>
+                          <td className="border-b px-2 py-1">{rule.name}</td>
+                          <td className="border-b px-2 py-1">{rule.lesson_count}</td>
+                          <td className="border-b px-2 py-1 max-w-xs truncate" title={rule.rule_content}>
+                            {rule.rule_content}
+                          </td>
+                          <td className="border-b px-2 py-1">
+                            {new Date(rule.created_at).toLocaleString()}
+                          </td>
+                          <td className="border-b px-2 py-1">
+                            <button
+                              type="button"
+                              className="rounded border px-1 py-0.5 text-primary border-primary hover:bg-primary hover:text-white transition-colors"
+                              onClick={() => {
+                                setEditingCourseRule(rule);
+                                // 滚动到顶部
+                                const container = document.querySelector('.overflow-y-auto');
+                                if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                            >
+                              修改
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         ) : null}

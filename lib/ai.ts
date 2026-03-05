@@ -885,8 +885,8 @@ export async function callAiWithPrompt(
   const setting = rows[0];
 
   const rawTimeoutMs = process.env.AI_TIMEOUT_MS ?? process.env.AI_REQUEST_TIMEOUT_MS;
-  const timeoutMs = rawTimeoutMs ? Number(rawTimeoutMs) : 600000;
-  const effectiveTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 600000;
+  const timeoutMs = rawTimeoutMs ? Number(rawTimeoutMs) : 1200000;
+  const effectiveTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 1200000;
 
   const baseUrlRaw =
     process.env.AI_BASE_URL ??
@@ -897,7 +897,7 @@ export async function callAiWithPrompt(
   const url = `${baseUrl}/v1/chat/completions`;
   const model = String(setting.model_name ?? "").trim() || "claude-sonnet-4-5-20250929-thinking";
   const rawMaxTokens = process.env.AI_MAX_TOKENS;
-  const maxTokens = rawMaxTokens ? Number(rawMaxTokens) : 8192;
+  const maxTokens = rawMaxTokens ? Number(rawMaxTokens) : 16384;
   const effectiveMaxTokens = Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 200000;
   const useStream = true;
 
@@ -949,10 +949,16 @@ export async function callAiWithPrompt(
     let buffer = "";
     let output = "";
     let finishReason: string | null = null;
+    let firstChunk = true;
+
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
+      if (firstChunk && buffer.length > 0) {
+        console.log(`[AI Stream] First buffer chunk (first 100 chars): ${buffer.slice(0, 100)}`);
+        firstChunk = false;
+      }
       while (true) {
         const lineBreakIndex = buffer.indexOf("\n");
         if (lineBreakIndex === -1) break;
@@ -976,6 +982,7 @@ export async function callAiWithPrompt(
           if (typeof delta === "string") {
             output += delta;
             if (delta && options.onDelta) {
+              // console.log(`[AI] Streaming delta length: ${delta.length}`);
               await options.onDelta(delta);
             }
           }
@@ -1068,6 +1075,8 @@ export async function callAiWithPrompt(
       try {
         const callOnce = async (previousAssistant: string | null) => {
           const messages = buildMessages(prompt, previousAssistant);
+          console.log(`[AI Call] Sending request to ${url} with model ${model}. Prompt length: ${prompt.length}. Previous assistant length: ${previousAssistant?.length ?? 0}`);
+          
           const response = await fetch(url, {
             method: "POST",
             headers: {
@@ -1085,6 +1094,9 @@ export async function callAiWithPrompt(
               stream: true
             })
           });
+
+          console.log(`[AI Call] Response status: ${response.status} ${response.statusText}`);
+
           if (!response.ok) {
             const text = await response.text();
             try {
@@ -1140,13 +1152,45 @@ export async function callAiWithPrompt(
 
         let fullContent = first.content;
         let finishReason = first.finishReason;
-        for (let i = 0; i < 2; i += 1) {
-          if (finishReason !== "length") break;
-          if (!fullContent.trim()) break;
+        console.log(`[AI Loop] Initial content length: ${fullContent.length}, finishReason: ${finishReason}`);
+
+        const isIncomplete = (text: string) => {
+          const trimmed = text.trim();
+          if (!trimmed) return false;
+          const lastChar = trimmed.slice(-1);
+          // Check for sentence terminators or markdown block terminators
+          return !['.', '!', '?', '。', '！', '？', '”', '’', '"', "'", '`', '\n'].includes(lastChar);
+        };
+
+        for (let i = 0; i < 10; i += 1) {
+          if (finishReason === "stop") {
+            console.log(`[AI Loop] Finish reason is 'stop'. Assuming complete.`);
+            break;
+          }
+
+          if (finishReason !== "length") {
+            // Heuristic: if content looks incomplete and we haven't hit the loop limit, try to continue
+            // This handles cases where model returns 'stop' prematurely or provider doesn't support 'length'
+            if (isIncomplete(fullContent) && i < 10) {
+               console.log(`[AI Loop] Content looks incomplete but finishReason is '${finishReason}'. Forcing continuation...`);
+            } else {
+               console.log(`[AI Loop] Breaking because finishReason is not 'length' (is '${finishReason}') and content looks complete`);
+               break;
+            }
+          }
+          if (!fullContent.trim()) {
+            console.log(`[AI Loop] Breaking because content is empty`);
+            break;
+          }
+          console.log(`[AI Loop] Continuing generation... Iteration ${i+1}`);
           const next = await callOnce(fullContent);
-          if (!next.content) break;
+          if (!next.content) {
+            console.log(`[AI Loop] Breaking because next content is empty`);
+            break;
+          }
           fullContent = fullContent + "\n" + next.content;
           finishReason = next.finishReason;
+          console.log(`[AI Loop] Iteration ${i+1} done. New total length: ${fullContent.length}, finishReason: ${finishReason}`);
         }
         return fullContent;
       } catch (error) {
@@ -1277,8 +1321,79 @@ function getDefaultPromptTemplate(slug: string) {
   return "";
 }
 
+function parseStructuredContent(content: string, customKeys?: { key: string; label: string }[]) {
+  const normalized = content.trim();
+  const defaultKeys = [
+     { key: "chanpin", label: "产品信息" },
+     { key: "dingwei", label: "定位" },
+     { key: "shijianshi", label: "四件事" },
+     { key: "jiugongge", label: "九宫格" },
+     { key: "guanxi", label: "四件事和九宫格关系" },
+     { key: "kegang", label: "本节课大纲" },
+     { key: "lastkegang", label: "上节课大纲" },
+     { key: "kegangjieshu", label: "课纲节数" },
+     { key: "kegangguize", label: "课纲规则" }
+  ];
+  const sectionKeys = customKeys || defaultKeys;
+
+  const buckets: Record<string, string[]> = {};
+  sectionKeys.forEach(k => buckets[k.key] = []);
+
+  let currentKey: string | null = null;
+  const lines = normalized.split("\n");
+  
+  const hasHeaders = sectionKeys.some(({ label }) => normalized.includes(label));
+  
+  if (hasHeaders) {
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        if (currentKey) buckets[currentKey].push(line);
+        continue;
+      }
+      
+      const found = sectionKeys.find(({ label }) => {
+        if (trimmed === label) return true;
+        if (trimmed.startsWith(label + ":") || trimmed.startsWith(label + "：")) return true;
+        if (trimmed.startsWith("【" + label) || trimmed.startsWith("「" + label)) return true;
+        
+        // Regex for numbered headers: 1. Label, 1、Label, (1) Label
+        const pattern = new RegExp(`^(\\d+[.、]\\s*|\\(\\d+\\)\\s*|（\\d+）\\s*)?${escapeRegExp(label)}[:：]?$`);
+        if (pattern.test(trimmed)) return true;
+
+        return false;
+      });
+      
+      if (found) {
+        currentKey = found.key;
+        continue;
+      }
+      if (currentKey) {
+        buckets[currentKey].push(line);
+      }
+    }
+  }
+  
+  const result: Record<string, string> = {};
+  for (const key in buckets) {
+    result[key] = buckets[key].join("\n").trim();
+  }
+  return { hasHeaders, result };
+}
+
 function buildPromptByTemplate(slug: string, template: string, content: string) {
+  const { hasHeaders, result: parsedVars } = parseStructuredContent(content);
+  console.log(`[Prompt Build] Slug: ${slug}, Has Headers: ${hasHeaders}, Keys found: ${Object.keys(parsedVars).filter(k => parsedVars[k]).join(", ")}`);
+
   if (slug === "course-outline") {
+    if (hasHeaders) {
+      return renderTemplate(template, {
+        ...parsedVars,
+        content
+      });
+    }
+
+    // Legacy fallback logic
     const normalized = content.trim();
     let shijianshi = normalized;
     let jiugongge = normalized;
@@ -1287,12 +1402,8 @@ function buildPromptByTemplate(slug: string, template: string, content: string) 
     if (nineIndex !== -1) {
       const before = normalized.slice(0, nineIndex).trim();
       const after = normalized.slice(nineIndex).trim();
-      if (before) {
-        shijianshi = before;
-      }
-      if (after) {
-        jiugongge = after;
-      }
+      if (before) shijianshi = before;
+      if (after) jiugongge = after;
     } else {
       const parts = normalized.split(/\n\s*\n/);
       if (parts.length >= 2) {
@@ -1300,89 +1411,39 @@ function buildPromptByTemplate(slug: string, template: string, content: string) 
         jiugongge = parts.slice(1).join("\n\n").trim();
       }
     }
-
-    return renderTemplate(template, { shijianshi, jiugongge, content });
+    
+    return renderTemplate(template, { 
+      shijianshi, 
+      jiugongge, 
+      content,
+      chanpin: "",
+      kegangjieshu: "",
+      kegangguize: ""
+    });
   }
 
   if (slug === "course-transcript") {
-    const normalized = content.trim();
-    const sectionKeys = [
-      { key: "chanpin", label: "产品信息" },
-      { key: "dingwei", label: "定位" },
-      { key: "shijianshi", label: "四件事" },
-      { key: "jiugongge", label: "九宫格" },
-      { key: "guanxi", label: "四件事和九宫格关系" },
-      { key: "kegang", label: "本节课大纲" },
-      { key: "lastkegang", label: "上节课大纲" }
-    ] as const;
-
-    const buckets: Record<
-      (typeof sectionKeys)[number]["key"],
-      string[]
-    > = {
-      chanpin: [],
-      dingwei: [],
-      shijianshi: [],
-      jiugongge: [],
-      guanxi: [],
-      kegang: [],
-      lastkegang: []
-    };
-
-    let currentKey: (typeof sectionKeys)[number]["key"] | null = null;
-    const lines = normalized.split("\n");
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        if (currentKey) {
-          buckets[currentKey].push(line);
-        }
-        continue;
-      }
-      const found = sectionKeys.find(({ label }) => {
-        if (trimmed === label) return true;
-        if (trimmed.startsWith(label + ":")) return true;
-        if (trimmed.startsWith(label + "：")) return true;
-        if (trimmed.startsWith("【" + label) || trimmed.startsWith("「" + label)) {
-          return true;
-        }
-        return false;
+    if (hasHeaders) {
+      const lastkegang = parsedVars.lastkegang || "（当前为第一节课程，无上一节课大纲）";
+      return renderTemplate(template, {
+        ...parsedVars,
+        lastkegang,
+        content,
+        description: content
       });
-      if (found) {
-        currentKey = found.key;
-        continue;
-      }
-      if (!currentKey) {
-        currentKey = "chanpin";
-      }
-      buckets[currentKey].push(line);
     }
 
-    const chanpin = buckets.chanpin.join("\n").trim();
-    const dingwei = buckets.dingwei.join("\n").trim();
-    const shijianshi = buckets.shijianshi.join("\n").trim();
-    const jiugongge = buckets.jiugongge.join("\n").trim();
-    const guanxi = buckets.guanxi.join("\n").trim();
-    const kegang = buckets.kegang.join("\n").trim();
-    const lastkegangRaw = buckets.lastkegang.join("\n").trim();
-    const lastkegang = lastkegangRaw || "（当前为第一节课程，无上一节课大纲）";
-
     return renderTemplate(template, {
-      chanpin,
-      dingwei,
-      shijianshi,
-      jiugongge,
-      guanxi,
-      kegang,
-      lastkegang,
       content,
-      description: content
+      description: content,
+      chanpin: content
     });
   }
 
   return renderTemplate(template, {
     content,
-    description: content
+    description: content,
+    ...parsedVars
   });
 }
 

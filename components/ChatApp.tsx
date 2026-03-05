@@ -33,6 +33,13 @@ type UserInfo = {
   role: "super_admin" | "admin" | "user";
 };
 
+type CourseRuleRow = {
+  id: number;
+  name: string;
+  lesson_count: number;
+  rule_content: string;
+};
+
 type Props = {
   user: UserInfo;
   agents: Agent[];
@@ -262,7 +269,10 @@ export default function ChatApp(props: Props) {
     courseOutlineContent?: string;
     currentLesson?: string;
     currentLessonOutline?: string;
+    courseLessonCount?: string;
+    courseRuleContent?: string;
   } | null>(null);
+  const [courseRules, setCourseRules] = useState<CourseRuleRow[]>([]);
   const [generatingConversationId, setGeneratingConversationId] = useState<
     number | null
   >(null);
@@ -936,7 +946,8 @@ export default function ChatApp(props: Props) {
               prev.map((m) => {
                 if (m.id !== assistantId) return m;
                 const prevContent = typeof m.content === "string" ? m.content : "";
-                return { ...m, content: prevContent + delta };
+                const newContent = prevContent === PENDING_PREFIX ? delta : prevContent + delta;
+                return { ...m, content: newContent };
               })
             );
             return;
@@ -1341,7 +1352,9 @@ export default function ChatApp(props: Props) {
       nineGridContent: "",
       courseOutlineContent: "",
       currentLesson: "",
-      currentLessonOutline: ""
+      currentLessonOutline: "",
+      courseLessonCount: "",
+      courseRuleContent: ""
     });
     setReferenceDialogOpen(true);
     try {
@@ -1351,6 +1364,13 @@ export default function ChatApp(props: Props) {
       }
       const data: string[] = await res.json();
       setProductNameOptions(data);
+      if (currentAgent.slug === "course-outline") {
+        const rulesRes = await fetch("/api/course-rules");
+        if (rulesRes.ok) {
+          const rulesData: CourseRuleRow[] = await rulesRes.json();
+          setCourseRules(rulesData);
+        }
+      }
     } catch (e: any) {
       setError(getErrorMessage(e, "加载产品名称失败"));
     }
@@ -2112,6 +2132,74 @@ export default function ChatApp(props: Props) {
                           }
                         />
                       </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-600">
+                          课纲规则
+                        </label>
+                        <select
+                          className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                          onChange={(e) => {
+                            const ruleId = Number(e.target.value);
+                            const rule = courseRules.find((r) => r.id === ruleId);
+                            if (rule) {
+                              setReferenceForm((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      courseLessonCount: String(rule.lesson_count),
+                                      courseRuleContent: rule.rule_content
+                                    }
+                                  : prev
+                              );
+                            }
+                          }}
+                        >
+                          <option value="">请选择课纲规则</option>
+                          {courseRules.map((rule) => (
+                            <option key={rule.id} value={rule.id}>
+                              {rule.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-600">
+                          课纲节数
+                        </label>
+                        <input
+                          className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                          value={referenceForm.courseLessonCount ?? ""}
+                          onChange={(event) =>
+                            setReferenceForm((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    courseLessonCount: event.target.value
+                                  }
+                                : prev
+                            )
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-600">
+                          课纲规则说明
+                        </label>
+                        <textarea
+                          className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                          value={referenceForm.courseRuleContent ?? ""}
+                          onChange={(event) =>
+                            setReferenceForm((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    courseRuleContent: event.target.value
+                                  }
+                                : prev
+                            )
+                          }
+                        />
+                      </div>
                     </>
                   ) : currentAgent && currentAgent.slug === "course-transcript" ? (
                     <>
@@ -2321,22 +2409,53 @@ export default function ChatApp(props: Props) {
                             currentAgent.slug === "course-outline" ||
                             currentAgent.slug === "course-transcript"
                           ) {
-                            const sections: string[] = [];
-                            const productContent = referenceForm.content.trim();
-                            const fourThings = (referenceForm.fourThingsContent ?? "").trim();
-                            const nineGrid = (referenceForm.nineGridContent ?? "").trim();
-                            if (productContent) {
-                              sections.push(
-                                `产品信息\n${productContent}`
-                              );
+                            if (currentAgent.slug === "course-outline") {
+                              const sections: string[] = [];
+                              const productContent = referenceForm.content.trim();
+                              const fourThings = (referenceForm.fourThingsContent ?? "").trim();
+                              const nineGrid = (referenceForm.nineGridContent ?? "").trim();
+                              if (productContent) {
+                                sections.push(
+                                  `产品信息\n${productContent}`
+                                );
+                              }
+                              if (fourThings) {
+                                sections.push(`四件事\n${fourThings}`);
+                              }
+                              if (nineGrid) {
+                                sections.push(`九宫格\n${nineGrid}`);
+                              }
+                              const lessonCount = (
+                                referenceForm.courseLessonCount ?? ""
+                              ).trim();
+                              const ruleContent = (
+                                referenceForm.courseRuleContent ?? ""
+                              ).trim();
+                              if (lessonCount) {
+                                sections.push(`课纲节数\n${lessonCount}`);
+                              }
+                              if (ruleContent) {
+                                sections.push(`课纲规则\n${ruleContent}`);
+                              }
+                              text = sections.join("\n\n");
+                            } else {
+                                const sections: string[] = [];
+                                const productContent = referenceForm.content.trim();
+                                const fourThings = (referenceForm.fourThingsContent ?? "").trim();
+                                const nineGrid = (referenceForm.nineGridContent ?? "").trim();
+                                if (productContent) {
+                                  sections.push(
+                                    `产品信息\n${productContent}`
+                                  );
+                                }
+                                if (fourThings) {
+                                  sections.push(`四件事\n${fourThings}`);
+                                }
+                                if (nineGrid) {
+                                  sections.push(`九宫格\n${nineGrid}`);
+                                }
+                                text = sections.join("\n\n");
                             }
-                            if (fourThings) {
-                              sections.push(`四件事\n${fourThings}`);
-                            }
-                            if (nineGrid) {
-                              sections.push(`九宫格\n${nineGrid}`);
-                            }
-                            text = sections.join("\n\n");
                           }
                           if (currentAgent.slug === "course-transcript") {
                             const extraSections: string[] = [];

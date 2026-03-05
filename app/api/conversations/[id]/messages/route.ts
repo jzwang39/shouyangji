@@ -166,6 +166,7 @@ export async function POST(request: Request, context: Params) {
                 const final = await callAiWithPrompt(prompt, {
                   onDelta: async (delta) => {
                     if (!delta) return;
+                    console.log(`[Route] onDelta called with length: ${delta.length}`);
                     fullText += delta;
                     send({ type: "delta", delta });
                     await persist(false);
