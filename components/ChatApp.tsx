@@ -200,7 +200,41 @@ function stripMarkdown(text: string) {
     .replace(/_(.*?)_/g, "$1");
 }
 
+function formatMarkdownForCopy(text: string) {
+  let processed = text;
+
+  // Code blocks: remove backticks but keep content
+  processed = processed.replace(/```[\s\S]*?```/g, (block) =>
+    block.replace(/```[a-zA-Z]*/g, "").replace(/```/g, "")
+  );
+
+  // Headers: Make them stand out with spacing and brackets
+  // # Header -> \n\n【Header】\n
+  processed = processed.replace(/^#+\s+(.*$)/gm, "\n\n【$1】\n");
+
+  // Bold/Italic: just strip markers
+  processed = processed.replace(/\*\*(.*?)\*\*/g, "$1");
+  processed = processed.replace(/__(.*?)__/g, "$1");
+  processed = processed.replace(/\*(.*?)\*/g, "$1");
+  processed = processed.replace(/_(.*?)_/g, "$1");
+
+  // Lists: Unified bullets
+  processed = processed.replace(/^[\s]*(\*|-|\+)\s+/gm, "• ");
+
+  // Inline code: strip backticks
+  processed = processed.replace(/`([^`]+)`/g, "$1");
+
+  // Links: strip url
+  processed = processed.replace(/\[(.*?)\]\(.*?\)/g, "$1");
+
+  // Cleanup whitespace
+  processed = processed.replace(/\n{3,}/g, "\n\n").trim();
+
+  return processed;
+}
+
 const PENDING_PREFIX = "正在生成，请稍候...";
+const VIRTUAL_CONVERSATION_ID = -1;
 
 function stripPendingPrefix(text: string) {
   const normalized = String(text ?? "").replace(/\r\n/g, "\n");
@@ -429,8 +463,9 @@ export default function ChatApp(props: Props) {
   }, [dragging]);
 
   useEffect(() => {
-    if (!currentConversationId) {
+    if (!currentConversationId || currentConversationId === VIRTUAL_CONVERSATION_ID) {
       setLoadingMessages(false);
+      setMessages([]);
       return;
     }
 
@@ -678,6 +713,7 @@ export default function ChatApp(props: Props) {
   const saveDraft = useCallback(
     async (conversationId: number, draft: string) => {
       setDrafts((prev) => ({ ...prev, [conversationId]: draft }));
+      if (conversationId === VIRTUAL_CONVERSATION_ID) return;
       await fetch(`/api/conversations/${conversationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -687,37 +723,67 @@ export default function ChatApp(props: Props) {
     []
   );
 
+  const cleanupCurrentConversationIfEmpty = useCallback(async () => {
+    if (
+      !currentConversationId ||
+      currentConversationId === VIRTUAL_CONVERSATION_ID
+    ) {
+      return;
+    }
+    if (loadingMessages) return;
+    if (messages.length > 0) return;
+    if (error) return;
+
+    const currentConv = conversations.find(
+      (c) => c.id === currentConversationId
+    );
+    if (!currentConv || currentConv.title !== "新对话") return;
+
+    setConversations((prev) =>
+      prev.filter((c) => c.id !== currentConversationId)
+    );
+
+    try {
+      await fetch(`/api/conversations/${currentConversationId}`, {
+        method: "DELETE",
+        keepalive: true
+      });
+    } catch (e) {
+      console.error("Auto-delete failed", e);
+    }
+  }, [
+    currentConversationId,
+    loadingMessages,
+    messages,
+    error,
+    conversations
+  ]);
+
   const handleSelectConversation = (conversationId: number) => {
     if (conversationId === currentConversationId) return;
+    void cleanupCurrentConversationIfEmpty();
     setCurrentConversationId(conversationId);
     setMessages([]);
     setMobileSidebarOpen(false);
   };
 
-  const handleNewConversation = async () => {
+  const handleNewConversation = () => {
     if (!selectedAgentId) return;
-    try {
-      const res = await fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId: selectedAgentId })
-      });
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-      const data: Conversation = await res.json();
-      setConversations((prev) => [data, ...prev]);
-      setCurrentConversationId(data.id);
-      setMessages([]);
-      setCurrentInput("");
-    } catch (e: any) {
-      setError(getErrorMessage(e, "新建对话失败"));
-    }
+    void cleanupCurrentConversationIfEmpty();
+    setCurrentAgentId(selectedAgentId);
+    setCurrentConversationId(VIRTUAL_CONVERSATION_ID);
+    setMessages([]);
+    setCurrentInput("");
+    setMobileSidebarOpen(false);
   };
 
-  const handleSelectAgent = async (agentId: number) => {
+  const handleSelectAgent = (agentId: number) => {
     setCurrentAgentId(agentId);
     if (!currentConversationId) {
+      return;
+    }
+    // If we are already in virtual mode, just update agent (done above)
+    if (currentConversationId === VIRTUAL_CONVERSATION_ID) {
       return;
     }
     const conv = conversations.find(
@@ -726,23 +792,12 @@ export default function ChatApp(props: Props) {
     if (!conv || conv.agent_id === agentId) {
       return;
     }
-    try {
-      const res = await fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId })
-      });
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-      const data: Conversation = await res.json();
-      setConversations((prev) => [data, ...prev]);
-      setCurrentConversationId(data.id);
-      setMessages([]);
-      setCurrentInput("");
-    } catch (e: any) {
-      setError(getErrorMessage(e, "新建对话失败"));
-    }
+
+    // Switch to virtual mode for new agent
+    void cleanupCurrentConversationIfEmpty();
+    setCurrentConversationId(VIRTUAL_CONVERSATION_ID);
+    setMessages([]);
+    setCurrentInput("");
   };
 
   const pollConversationMessages = useCallback(
@@ -845,7 +900,7 @@ export default function ChatApp(props: Props) {
     ]);
     setCurrentInput("");
     let conversationId = currentConversationId;
-    if (!conversationId) {
+    if (!conversationId || conversationId === VIRTUAL_CONVERSATION_ID) {
       try {
         const convRes = await fetch("/api/conversations", {
           method: "POST",
@@ -1206,6 +1261,24 @@ export default function ChatApp(props: Props) {
     }
   };
 
+  const handleCopyVisibleResult = async (message: Message) => {
+    try {
+      const text = formatMarkdownForCopy(stripPendingPrefix(message.content));
+      await navigator.clipboard.writeText(text);
+      await fetch("/api/operations/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "copy_visible_result",
+          targetType: "message",
+          targetId: message.id
+        })
+      });
+    } catch (e: any) {
+      setError(getErrorMessage(e, "复制失败"));
+    }
+  };
+
   const handleRegenerate = async () => {
     const lastAssistant = [...messages]
       .reverse()
@@ -1285,6 +1358,7 @@ export default function ChatApp(props: Props) {
   }, [currentConversationId, loadingMessages, messages.length]);
 
   const handleLogout = async () => {
+    void cleanupCurrentConversationIfEmpty();
     await signOut({ redirect: false });
     window.location.href = "/login";
   };
@@ -1583,6 +1657,7 @@ export default function ChatApp(props: Props) {
                   type="button"
                   className="text-[10px] text-left opacity-40 hover:opacity-100 transition-opacity"
                   onClick={() => {
+                    void cleanupCurrentConversationIfEmpty();
                     window.location.href = "/account/password";
                   }}
                 >
@@ -1606,6 +1681,7 @@ export default function ChatApp(props: Props) {
               type="button"
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-xs font-semibold text-white shadow-md hover:bg-primary-hover transition-all active:scale-[0.98]"
               onClick={() => {
+                void cleanupCurrentConversationIfEmpty();
                 window.location.href = "/settings";
               }}
             >
@@ -1649,6 +1725,7 @@ export default function ChatApp(props: Props) {
               type="button"
               className="rounded border px-2 py-1 text-xs"
               onClick={() => {
+                void cleanupCurrentConversationIfEmpty();
                 window.location.href = "/settings";
               }}
             >
@@ -1914,14 +1991,20 @@ export default function ChatApp(props: Props) {
                               <button
                                 type="button"
                                 className="underline"
-                                onClick={handleRegenerate}
+                                onClick={() => handleCopyVisibleResult(message)}
                               >
-                                重新生成
+                                结果拷贝
                               </button>
                             ) : null}
                           </div>
                         </div>
-                        <div className="prose prose-sm max-w-none">
+                        <div
+                          className={`prose prose-base max-w-none prose-headings:font-bold prose-p:leading-loose prose-p:my-4 prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg ${
+                            message.role === "user"
+                              ? "prose-headings:text-white prose-p:text-white prose-strong:text-white prose-li:marker:text-white/70 text-white"
+                              : "prose-headings:text-slate-900 prose-li:marker:text-slate-500"
+                          }`}
+                        >
                           <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
                             {displayedContent}
                           </ReactMarkdown>
