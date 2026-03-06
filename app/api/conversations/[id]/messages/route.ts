@@ -52,7 +52,7 @@ export async function POST(request: Request, context: Params) {
     }
 
     const conversations = await query(
-      "SELECT c.id, c.title, c.agent_id, a.slug FROM conversations c JOIN agents a ON c.agent_id = a.id WHERE c.id = ? AND c.user_id = ? AND c.is_deleted = 0",
+      "SELECT c.id, c.title, c.agent_id, a.slug, a.name as agent_name FROM conversations c JOIN agents a ON c.agent_id = a.id WHERE c.id = ? AND c.user_id = ? AND c.is_deleted = 0",
       [conversationId, userId]
     );
     if (conversations.length === 0) {
@@ -64,6 +64,7 @@ export async function POST(request: Request, context: Params) {
       title: string;
       agent_id: number;
       slug: string;
+      agent_name: string;
     };
 
     const result: any = await query(
@@ -73,7 +74,10 @@ export async function POST(request: Request, context: Params) {
     const messageId = result.insertId as number;
 
     if (conversation.title === "新对话") {
-      const title = content.slice(0, 30);
+      // Use user's first message as product name (truncated if too long) + agent name
+      // Rule: Product Name + "-" + Agent Name
+      const productName = content.length > 20 ? content.slice(0, 20) : content;
+      const title = `${productName}-${conversation.agent_name}`;
       await query(
         "UPDATE conversations SET title = ?, updated_at = NOW() WHERE id = ?",
         [title, conversationId]
