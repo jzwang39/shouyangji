@@ -74,7 +74,18 @@ export async function POST(request: Request, context: Params) {
     const messageId = result.insertId as number;
 
     if (conversation.title === "新对话") {
-      let productName = content.length > 20 ? content.slice(0, 20) : content;
+      // Initialize with a cleaned version of content to ensure fallback is clean
+      // Remove common brackets and quotes
+      let productName = content
+        .replace(/['"《》\[\]【】（）()]/g, "")
+        .trim();
+      
+      if (productName.length > 20) {
+        productName = productName.slice(0, 20);
+      } else if (productName.length === 0) {
+        // If cleanup resulted in empty string (unlikely), revert to raw content slice
+        productName = content.slice(0, 20);
+      }
       
       try {
         // Use AI to extract product name intelligently
@@ -92,12 +103,15 @@ ${content}`;
         const trimmed = extracted?.trim();
         if (trimmed) {
            // Cleanup any remaining quotes or brackets just in case
-           productName = trimmed.replace(/['"《》\[\]【】]/g, '');
-           if (productName.length > 20) productName = productName.slice(0, 20);
+           const cleaned = trimmed.replace(/['"《》\[\]【】（）()]/g, "");
+           if (cleaned) {
+             productName = cleaned;
+             if (productName.length > 20) productName = productName.slice(0, 20);
+           }
         }
       } catch (e) {
         console.error("Failed to extract product name via AI:", e);
-        // Fallback to simple slicing if AI fails
+        // Fallback to the already cleaned productName
       }
 
       const title = `${productName}-${conversation.agent_name}`;
