@@ -74,9 +74,32 @@ export async function POST(request: Request, context: Params) {
     const messageId = result.insertId as number;
 
     if (conversation.title === "新对话") {
-      // Use user's first message as product name (truncated if too long) + agent name
-      // Rule: Product Name + "-" + Agent Name
-      const productName = content.length > 20 ? content.slice(0, 20) : content;
+      let productName = content.length > 20 ? content.slice(0, 20) : content;
+      
+      try {
+        // Use AI to extract product name intelligently
+        const extractionPrompt = `请从以下输入信息里提取产品或方案名称。
+规则：
+1. 只返回名称本身，不要包含任何标点符号、解释性文字或“产品名称：”等前缀。
+2. 比如输入“[江小养纳豆红曲四步疗法]”，应提取“江小养纳豆红曲”。
+3. 如果找不到明确的产品名称，请总结一个简短的主题（不超过10个字）。
+4. 忽略方括号、书名号等包裹符号。
+
+输入信息：
+${content}`;
+        
+        const extracted = await callAiWithPrompt(extractionPrompt);
+        const trimmed = extracted?.trim();
+        if (trimmed) {
+           // Cleanup any remaining quotes or brackets just in case
+           productName = trimmed.replace(/['"《》\[\]【】]/g, '');
+           if (productName.length > 20) productName = productName.slice(0, 20);
+        }
+      } catch (e) {
+        console.error("Failed to extract product name via AI:", e);
+        // Fallback to simple slicing if AI fails
+      }
+
       const title = `${productName}-${conversation.agent_name}`;
       await query(
         "UPDATE conversations SET title = ?, updated_at = NOW() WHERE id = ?",
