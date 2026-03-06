@@ -105,6 +105,7 @@ ${content}`;
         "UPDATE conversations SET title = ?, updated_at = NOW() WHERE id = ?",
         [title, conversationId]
       );
+      conversation.title = title; // Update local variable to send back
     } else {
       await query(
         "UPDATE conversations SET updated_at = NOW() WHERE id = ?",
@@ -170,7 +171,8 @@ ${content}`;
               message,
               aiReply,
               aiPrompt,
-              aiReplyPending: true
+              aiReplyPending: true,
+              conversationTitle: conversation.title
             });
 
             void (async () => {
@@ -337,7 +339,8 @@ ${content}`;
       message,
       aiReply,
       aiPrompt,
-      aiReplyPending: aiReply?.content === "正在生成，请稍候..."
+      aiReplyPending: aiReply?.content === "正在生成，请稍候...",
+      conversationTitle: conversation.title
     });
   } catch (e: any) {
     const message =

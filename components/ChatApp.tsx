@@ -962,6 +962,7 @@ export default function ChatApp(props: Props) {
         conversationId ? { ...prev, [conversationId]: "" } : prev
       );
 
+      let newConversationTitle: string | null = null;
       const contentType = res.headers.get("content-type") ?? "";
       if (contentType.includes("text/event-stream")) {
         setGeneratingConversationId(conversationId);
@@ -979,6 +980,15 @@ export default function ChatApp(props: Props) {
             const serverMessage: Message = payload.message;
             const aiReply: Message | null = payload.aiReply ?? null;
             const promptText: string | null = payload.aiPrompt ?? null;
+            if (payload.conversationTitle) {
+              newConversationTitle = payload.conversationTitle;
+              setConversations((prev) =>
+                prev.map((conversation) => {
+                  if (conversation.id !== conversationId) return conversation;
+                  return { ...conversation, title: payload.conversationTitle };
+                })
+              );
+            }
             if (aiReply) {
               assistantId = aiReply.id;
             }
@@ -1086,6 +1096,9 @@ export default function ChatApp(props: Props) {
         const aiReply: Message | null = data.aiReply ?? null;
         const prompt: string | null = data.aiPrompt ?? null;
         const aiReplyPending: boolean = data.aiReplyPending === true;
+        if (data.conversationTitle) {
+          newConversationTitle = data.conversationTitle;
+        }
         if (aiReplyPending) {
           setGeneratingConversationId(conversationId);
         } else {
@@ -1111,6 +1124,12 @@ export default function ChatApp(props: Props) {
           }
           if (conversation.title !== "新对话") {
             return conversation;
+          }
+          if (newConversationTitle) {
+            return {
+              ...conversation,
+              title: newConversationTitle
+            };
           }
           return {
             ...conversation,
