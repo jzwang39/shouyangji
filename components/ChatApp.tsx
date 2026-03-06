@@ -269,6 +269,7 @@ export default function ChatApp(props: Props) {
     agents[0]?.id ?? null
   );
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [messagesReloadKey, setMessagesReloadKey] = useState(0);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devMode, setDevMode] = useState(false);
@@ -491,10 +492,41 @@ export default function ChatApp(props: Props) {
           return;
         }
         if (!res.ok) {
-          throw new Error(await res.text());
+          const contentType = res.headers.get("content-type") ?? "";
+          let details = "";
+          if (contentType.includes("application/json")) {
+            try {
+              const data = (await res.json()) as { error?: unknown; message?: unknown };
+              if (typeof data.error === "string") details = data.error;
+              else if (typeof data.message === "string") details = data.message;
+            } catch {
+            }
+          } else {
+            details = (await res.text()).trim();
+          }
+          const safeDetails =
+            details && !details.includes("<") && !details.includes("&lt;")
+              ? details
+              : "";
+          let hint = "";
+          if (res.status === 504) hint = "网关超时";
+          if (res.status === 502) hint = "网关错误";
+          if (res.status === 503) hint = "服务不可用";
+          if (res.status === 401) hint = "未登录";
+          if (res.status === 403) hint = "无权限";
+          const message = safeDetails || `加载消息失败（HTTP ${res.status}${hint ? `：${hint}` : ""}）`;
+          throw new Error(message);
         }
         const data: Message[] = await res.json();
-        setMessages(data);
+        setMessages((prev) => {
+          const optimistic = prev.filter((m) => typeof m.id === "number" && m.id < 0);
+          if (optimistic.length === 0) return data;
+          const remaining = optimistic.filter(
+            (m) => !data.some((d) => d.role === m.role && d.content === m.content)
+          );
+          if (remaining.length === 0) return data;
+          return [...data, ...remaining];
+        });
         const lastAssistant = [...data]
           .reverse()
           .find((message) => message.role === "assistant");
@@ -525,7 +557,7 @@ export default function ChatApp(props: Props) {
     return () => {
       controller.abort();
     };
-  }, [currentConversationId, getErrorMessage]);
+  }, [currentConversationId, getErrorMessage, messagesReloadKey]);
 
   useEffect(() => {
     if (!loadingMessages) return;
@@ -1930,6 +1962,13 @@ export default function ChatApp(props: Props) {
             {error ? (
               <div className="mb-3 rounded bg-red-50 px-3 py-2 text-xs text-red-600">
                 {error}
+                <button
+                  type="button"
+                  className="ml-2 underline"
+                  onClick={() => setMessagesReloadKey((prev) => prev + 1)}
+                >
+                  重试
+                </button>
               </div>
             ) : null}
             {generatingConversationId === currentConversationId ? (
