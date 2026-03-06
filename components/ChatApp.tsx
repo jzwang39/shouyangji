@@ -994,7 +994,7 @@ export default function ChatApp(props: Props) {
             }
             setMessages((prev) => {
               const replaced = prev.map((m) =>
-                m.id === tempId ? serverMessage : m
+                m.id === tempId ? (serverMessage || m) : m
               );
               if (!aiReply) return replaced;
               return [...replaced, { ...aiReply, content: PENDING_PREFIX }];

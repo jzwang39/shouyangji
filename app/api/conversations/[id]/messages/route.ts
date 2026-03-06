@@ -126,6 +126,19 @@ ${content}`;
       [messageId]
     );
 
+    if (!message) {
+      // Fallback if SELECT fails
+      // We know messageId and content because we just inserted it
+      // This ensures we always have a message to send back
+      // and prevents the user message from disappearing
+      (message as any) = {
+        id: messageId,
+        role: "user",
+        content,
+        created_at: new Date()
+      };
+    }
+
     let aiReply: any = null;
     let aiPrompt: string | null = null;
 
