@@ -870,6 +870,10 @@ export function buildCourseTranscriptPrompt(content: string) {
 
 type CallAiWithPromptOptions = {
   onDelta?: (delta: string) => void | Promise<void>;
+  messages?: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
 };
 
 export async function callAiWithPrompt(
@@ -1023,10 +1027,46 @@ export async function callAiWithPrompt(
   };
 
   try {
+    const baseConversationMessages =
+      Array.isArray(options.messages) && options.messages.length > 0
+        ? options.messages
+            .map((item) => {
+              const role =
+                item?.role === "system" ||
+                item?.role === "assistant" ||
+                item?.role === "user"
+                  ? item.role
+                  : "user";
+              const content = String(item?.content ?? "").trim();
+              if (!content) return null;
+              return { role, content };
+            })
+            .filter(
+              (
+                item
+              ): item is { role: "system" | "user" | "assistant"; content: string } =>
+                !!item
+            )
+        : null;
+
     const buildMessages = (
       basePrompt: string,
       previousAssistant: string | null
     ) => {
+      if (baseConversationMessages && baseConversationMessages.length > 0) {
+        if (previousAssistant && previousAssistant.trim()) {
+          return [
+            ...baseConversationMessages,
+            { role: "assistant" as const, content: previousAssistant },
+            {
+              role: "user" as const,
+              content:
+                "继续接着上文输出剩余部分，不要重复，保持原有结构与标题层级，直到完整结束。"
+            }
+          ];
+        }
+        return baseConversationMessages;
+      }
       if (previousAssistant && previousAssistant.trim()) {
         return [
           { role: "user", content: basePrompt },

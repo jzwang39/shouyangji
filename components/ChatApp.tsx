@@ -243,6 +243,16 @@ function stripPendingPrefix(text: string) {
   return rest ? rest : PENDING_PREFIX;
 }
 
+function extractProductOnePagerSaveContent(text: string) {
+  const source = String(text ?? "");
+  const marker = "产品基本信息一页纸";
+  const markerIndex = source.indexOf(marker);
+  if (markerIndex === -1) {
+    return source;
+  }
+  return source.slice(markerIndex).trim();
+}
+
 export default function ChatApp(props: Props) {
   // Update timestamp: 2026-03-05 17:35
   const { user, agents, initialConversations } = props;
@@ -1409,6 +1419,27 @@ export default function ChatApp(props: Props) {
     });
   }, [currentConversationId, loadingMessages, messages.length]);
 
+  useEffect(() => {
+    if (!currentConversationId) return;
+    if (loadingMessages) return;
+    if (currentAgent?.slug !== "product-one-pager") return;
+    if (generatingConversationId !== currentConversationId) return;
+
+    requestAnimationFrame(() => {
+      bottomAnchorRef.current?.scrollIntoView({ block: "end" });
+      if (lastAssistantContentRef.current) {
+        lastAssistantContentRef.current.scrollTop =
+          lastAssistantContentRef.current.scrollHeight;
+      }
+    });
+  }, [
+    currentAgent?.slug,
+    currentConversationId,
+    generatingConversationId,
+    loadingMessages,
+    messages
+  ]);
+
   const handleLogout = async () => {
     void cleanupCurrentConversationIfEmpty();
     await signOut({ redirect: false });
@@ -1435,12 +1466,17 @@ export default function ChatApp(props: Props) {
         currentAgent.slug,
         currentAgent.name
       );
+      const normalizedContent = stripPendingPrefix(message.content);
+      const resultContent =
+        currentAgent.slug === "product-one-pager"
+          ? extractProductOnePagerSaveContent(normalizedContent)
+          : normalizedContent;
       const nowIso = new Date().toISOString();
       setSaveForm({
         productName: "",
         agentName: agentDisplayName,
         lessonCount: "0",
-        resultContent: stripPendingPrefix(message.content),
+        resultContent,
         createdAt: nowIso,
         updatedAt: nowIso
       });
@@ -1983,7 +2019,9 @@ export default function ChatApp(props: Props) {
 
             {!loadingMessages && messages.length === 0 ? (
               <div className="mt-8 text-center text-sm text-slate-500">
-                还没有消息，输入内容开始对话
+                {currentAgent?.slug === "product-one-pager"
+                  ? '我是一位大健康产品策划顾问，专门帮助产品团队梳理"产品基本信息一页纸"，可以输入：开始'
+                  : "还没有消息，输入内容开始对话"}
               </div>
             ) : null}
 

@@ -11,6 +11,8 @@ type Params = {
   };
 };
 
+const PENDING_PREFIX = "正在生成，请稍候...";
+
 export async function GET(_request: Request, context: Params) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -166,7 +168,52 @@ ${content}`;
     ]);
 
     if (aiAgents.has(conversation.slug)) {
-      const prompt = await buildPromptForAgent(conversation.slug, content);
+      let prompt = await buildPromptForAgent(conversation.slug, content);
+      let aiMessages:
+        | Array<{ role: "system" | "user" | "assistant"; content: string }>
+        | undefined;
+
+      if (conversation.slug === "product-one-pager") {
+        const systemPrompt = await buildPromptForAgent(conversation.slug, "");
+        const historyRows = await query<{
+          role: "user" | "assistant" | "system";
+          content: string;
+        }>(
+          "SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC",
+          [conversationId]
+        );
+        const historyMessages = historyRows
+          .map((row) => {
+            if (
+              row.role !== "system" &&
+              row.role !== "user" &&
+              row.role !== "assistant"
+            ) {
+              return null;
+            }
+            let normalizedContent = String(row.content ?? "");
+            if (row.role === "assistant" && normalizedContent.startsWith(PENDING_PREFIX)) {
+              normalizedContent = normalizedContent
+                .slice(PENDING_PREFIX.length)
+                .replace(/^\s+/, "");
+            }
+            const trimmed = normalizedContent.trim();
+            if (!trimmed) return null;
+            return {
+              role: row.role,
+              content: trimmed
+            };
+          })
+          .filter(
+            (
+              item
+            ): item is { role: "system" | "user" | "assistant"; content: string } =>
+              !!item
+          );
+        aiMessages = [{ role: "system", content: systemPrompt }, ...historyMessages];
+        prompt = systemPrompt;
+      }
+
       aiPrompt = prompt;
       const pendingPrefix = "正在生成，请稍候...";
       const aiResult: any = await query(
@@ -220,6 +267,7 @@ ${content}`;
 
               try {
                 const final = await callAiWithPrompt(prompt, {
+                  messages: aiMessages,
                   onDelta: async (delta) => {
                     if (!delta) return;
                     console.log(`[Route] onDelta called with length: ${delta.length}`);
@@ -309,7 +357,7 @@ ${content}`;
         let aiText = "";
         let isError = false;
         try {
-          aiText = await callAiWithPrompt(prompt);
+          aiText = await callAiWithPrompt(prompt, { messages: aiMessages });
         } catch (e: any) {
           let message = "";
           if (typeof e?.message === "string" && e.message) {
