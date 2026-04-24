@@ -603,20 +603,20 @@ export default function SettingsApp(props: Props) {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 p-2 md:p-8">
-      <div className="mx-auto w-full max-w-5xl h-full flex flex-col rounded-2xl bg-white p-4 md:p-8 shadow-xl overflow-hidden border border-slate-200/50">
+    <div className="flex h-screen w-screen overflow-hidden bg-sidebar p-2 md:p-8">
+      <div className="mx-auto w-full max-w-5xl h-full flex flex-col rounded-2xl bg-white p-4 md:p-8 shadow-sm overflow-hidden border border-sidebar-active/40">
         <div className="mb-8 flex flex-none items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">系统管理中心</h1>
-            <p className="mt-1.5 text-xs text-slate-500 flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-sidebar-text">系统管理中心</h1>
+            <p className="mt-1.5 text-xs text-sidebar-text opacity-60 flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              当前登录：<span className="font-semibold text-slate-700">{currentUser.username}</span>
-              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] border border-slate-200">{currentUser.role}</span>
+              当前登录：<span className="font-semibold opacity-100">{currentUser.username}</span>
+              <span className="px-1.5 py-0.5 rounded bg-sidebar border border-sidebar-active text-[10px]">{currentUser.role}</span>
             </p>
           </div>
           <button
             type="button"
-            className="group flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600 transition-all hover:bg-primary hover:text-white"
+            className="group flex items-center gap-2 rounded-xl border border-sidebar-active px-4 py-2 text-xs font-medium text-sidebar-text opacity-70 transition-all hover:opacity-100 hover:bg-sidebar"
             onClick={() => {
               window.location.href = "/chat";
             }}
@@ -653,10 +653,10 @@ export default function SettingsApp(props: Props) {
             <button
               key={item.id}
               type="button"
-              className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all duration-200 ${
-                tab === item.id 
-                  ? "bg-primary text-white shadow-lg shadow-primary/30 scale-105" 
-                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                tab === item.id
+                  ? "bg-primary text-white"
+                  : "text-sidebar-text opacity-60 hover:opacity-100 hover:bg-sidebar"
               }`}
               onClick={() => setTab(item.id as any)}
             >
@@ -669,7 +669,7 @@ export default function SettingsApp(props: Props) {
         </div>
 
         {error ? (
-          <div className="mb-4 flex flex-none items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 border border-red-100 shadow-sm animate-shake">
+          <div className="mb-4 flex flex-none items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 border border-red-100">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -681,15 +681,15 @@ export default function SettingsApp(props: Props) {
 
         {tab === "users" ? (
           <div className="space-y-6 text-xs">
-            <div className="rounded border border-slate-200 p-3">
-              <div className="mb-2 font-semibold">新增用户</div>
+            <div className="rounded-xl border border-sidebar-active/40 bg-sidebar p-4">
+              <div className="mb-3 text-sm font-semibold text-sidebar-text">新增用户</div>
               <div className="grid gap-3 md:grid-cols-4">
                 <div>
-                  <label className="mb-1 block text-[11px] text-slate-600">
+                  <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                     用户名
                   </label>
                   <input
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-sidebar-active/60 bg-white px-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
                     value={newUser.username}
                     onChange={(event) =>
                       setNewUser((prev) => ({
@@ -700,11 +700,11 @@ export default function SettingsApp(props: Props) {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] text-slate-600">
+                  <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                     初始密码
                   </label>
                   <input
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-sidebar-active/60 bg-white px-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
                     value={newUser.password}
                     onChange={(event) =>
                       setNewUser((prev) => ({
@@ -715,11 +715,11 @@ export default function SettingsApp(props: Props) {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] text-slate-600">
+                  <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                     权限
                   </label>
                   <select
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-sidebar-active/60 bg-white px-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
                     value={newUser.role}
                     onChange={(event) =>
                       setNewUser((prev) => ({
@@ -733,11 +733,11 @@ export default function SettingsApp(props: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] text-slate-600">
+                  <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                     角色
                   </label>
                   <select
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-sidebar-active/60 bg-white px-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
                     value={
                       newUserAgentRoleId !== null
                         ? String(newUserAgentRoleId)
@@ -761,7 +761,7 @@ export default function SettingsApp(props: Props) {
               </div>
               <button
                 type="button"
-                className="mt-3 rounded bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="mt-4 rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-white hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={creatingUser}
                 onClick={handleCreateUser}
               >
@@ -770,32 +770,32 @@ export default function SettingsApp(props: Props) {
             </div>
 
             <div>
-              <div className="mb-2 font-semibold">用户列表</div>
-              <div className="overflow-x-auto rounded border border-slate-200">
+              <div className="mb-3 text-sm font-semibold text-sidebar-text">用户列表</div>
+              <div className="overflow-x-auto rounded-xl border border-sidebar-active/40">
                 <table className="min-w-full border-collapse text-[11px]">
-                  <thead className="bg-slate-100">
-                    <tr>
-                      <th className="border-b px-2 py-1 text-left">ID</th>
-                      <th className="border-b px-2 py-1 text-left">用户名</th>
-                      <th className="border-b px-2 py-1 text-left">权限</th>
-                      <th className="border-b px-2 py-1 text-left">角色</th>
-                      <th className="border-b px-2 py-1 text-left">状态</th>
-                      <th className="border-b px-2 py-1 text-left">创建时间</th>
-                      <th className="border-b px-2 py-1 text-left">操作</th>
+                  <thead>
+                    <tr className="bg-sidebar">
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">ID</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">用户名</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">权限</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">角色</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">状态</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">创建时间</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {users.map((userRow) => (
-                      <tr key={userRow.id} className="odd:bg-white even:bg-slate-50">
-                        <td className="border-b px-2 py-1">
+                      <tr key={userRow.id} className="border-b border-sidebar-active/20 hover:bg-sidebar/40 transition-colors">
+                        <td className="px-3 py-2 text-sidebar-text">
                           {userRow.id}
                         </td>
-                        <td className="border-b px-2 py-1">
+                        <td className="px-3 py-2 font-medium text-sidebar-text">
                           {userRow.username}
                         </td>
-                        <td className="border-b px-2 py-1">
+                        <td className="px-3 py-2">
                           <select
-                            className="rounded border border-slate-300 px-1 py-0.5 text-[11px]"
+                            className="rounded-lg border border-sidebar-active/60 bg-white px-2 py-1 text-[11px] text-sidebar-text outline-none"
                             value={userPermissionDraft[userRow.id] ?? userRow.role}
                             disabled={
                               userRow.role === "super_admin" ||
@@ -821,9 +821,9 @@ export default function SettingsApp(props: Props) {
                               )}
                           </select>
                         </td>
-                        <td className="border-b px-2 py-1">
+                        <td className="px-3 py-2">
                           <select
-                            className="rounded border border-slate-300 px-1 py-0.5 text-[11px]"
+                            className="rounded-lg border border-sidebar-active/60 bg-white px-2 py-1 text-[11px] text-sidebar-text outline-none"
                             value={
                               userAgentRoleDraft[userRow.id] !== undefined &&
                               userAgentRoleDraft[userRow.id] !== null
@@ -849,25 +849,25 @@ export default function SettingsApp(props: Props) {
                             ))}
                           </select>
                         </td>
-                        <td className="border-b px-2 py-1">
+                        <td className="px-3 py-2">
                           {userRow.is_deleted ? (
                             <span className="text-red-500">已删除</span>
                           ) : userRow.is_active ? (
                             <span className="text-green-600">可登录</span>
                           ) : (
-                            <span className="text-slate-500">禁止登录</span>
+                            <span className="text-sidebar-text opacity-40">禁止登录</span>
                           )}
                         </td>
-                        <td className="border-b px-2 py-1">
+                        <td className="px-3 py-2 text-sidebar-text opacity-60">
                           {new Date(userRow.created_at).toLocaleString()}
                         </td>
-                        <td className="border-b px-2 py-1">
-                          <div className="flex flex-wrap gap-1">
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1.5">
                             {!userRow.is_deleted ? (
                               <>
                                 <button
                                   type="button"
-                                  className="rounded border px-1 py-0.5"
+                                  className="rounded-lg border border-sidebar-active/60 px-2 py-1 text-sidebar-text hover:bg-sidebar transition-colors disabled:opacity-30"
                                   onClick={() => handleSaveUserRow(userRow)}
                                   disabled={userRow.role === "super_admin"}
                                 >
@@ -875,7 +875,7 @@ export default function SettingsApp(props: Props) {
                                 </button>
                                 <button
                                   type="button"
-                                  className="rounded border px-1 py-0.5"
+                                  className="rounded-lg border border-sidebar-active/60 px-2 py-1 text-sidebar-text hover:bg-sidebar transition-colors disabled:opacity-30"
                                   onClick={() =>
                                     handleUpdateUser(userRow.id, {
                                       isActive: !userRow.is_active
@@ -891,7 +891,7 @@ export default function SettingsApp(props: Props) {
                             userRow.role !== "super_admin" ? (
                               <button
                                 type="button"
-                                className="rounded border px-1 py-0.5 text-red-500"
+                                className="rounded-lg px-2 py-1 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30"
                                 disabled={
                                   currentUser.role === "admin" &&
                                   userRow.role === "admin"
@@ -914,8 +914,8 @@ export default function SettingsApp(props: Props) {
 
         {tab === "roles" ? (
           <div className="space-y-6 text-xs">
-            <div className="rounded border border-slate-200 p-3">
-              <div className="mb-2 font-semibold">新增角色</div>
+            <div className="rounded-xl border border-sidebar-active/40 bg-sidebar p-4">
+              <div className="mb-3 text-sm font-semibold text-sidebar-text">新增角色</div>
               <div className="grid gap-3 md:grid-cols-3">
                 <div>
                   <label className="mb-1 block text-[11px] text-slate-600">
@@ -938,10 +938,10 @@ export default function SettingsApp(props: Props) {
                         <button
                           key={agent.id}
                           type="button"
-                          className={`rounded px-2 py-1 text-[11px] ${
+                          className={`rounded-lg px-3 py-1.5 text-[11px] transition-colors ${
                             selected
                               ? "bg-primary text-white"
-                              : "bg-slate-100 text-slate-600"
+                              : "bg-sidebar-active/60 text-sidebar-text hover:bg-sidebar-active"
                           }`}
                           onClick={() => handleToggleNewRoleAgent(agent.id)}
                         >
@@ -954,7 +954,7 @@ export default function SettingsApp(props: Props) {
               </div>
               <button
                 type="button"
-                className="mt-3 rounded bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="mt-4 rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-white hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={creatingRole}
                 onClick={handleCreateRole}
               >
@@ -963,28 +963,26 @@ export default function SettingsApp(props: Props) {
             </div>
 
             <div>
-              <div className="mb-2 flex items-center justify-between">
-                <div className="font-semibold">角色列表</div>
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-sm font-semibold text-sidebar-text">角色列表</div>
                 <button
                   type="button"
-                  className="rounded border px-2 py-1"
+                  className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar transition-all"
                   onClick={reloadRoles}
                   disabled={loadingRoles}
                 >
                   {loadingRoles ? "刷新中..." : "刷新"}
                 </button>
               </div>
-              <div className="overflow-x-auto rounded border border-slate-200">
+              <div className="overflow-x-auto rounded-xl border border-sidebar-active/40">
                 <table className="min-w-full border-collapse text-[11px]">
-                  <thead className="bg-slate-100">
-                    <tr>
-                      <th className="border-b px-2 py-1 text-left">角色名称</th>
-                      <th className="border-b px-2 py-1 text-left">
-                        包含的智能体
-                      </th>
+                  <thead>
+                    <tr className="bg-sidebar">
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">角色名称</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">包含的智能体</th>
                       {(currentUser.role === "admin" ||
                         currentUser.role === "super_admin") && (
-                        <th className="border-b px-2 py-1 text-left">操作</th>
+                        <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">操作</th>
                       )}
                     </tr>
                   </thead>
@@ -995,28 +993,25 @@ export default function SettingsApp(props: Props) {
                         .map((agent) => agent.name)
                         .join("、");
                       return (
-                        <tr
-                          key={role.id}
-                          className="odd:bg-white even:bg-slate-50"
-                        >
-                          <td className="border-b px-2 py-1">{role.name}</td>
-                          <td className="border-b px-2 py-1">
+                        <tr key={role.id} className="border-b border-sidebar-active/20 hover:bg-sidebar/40 transition-colors">
+                          <td className="px-3 py-2 font-medium text-sidebar-text">{role.name}</td>
+                          <td className="px-3 py-2 text-sidebar-text opacity-70">
                             {names || "（未配置）"}
                           </td>
                           {(currentUser.role === "admin" ||
                             currentUser.role === "super_admin") && (
-                            <td className="border-b px-2 py-1">
-                              <div className="flex flex-wrap gap-1">
+                            <td className="px-3 py-2">
+                              <div className="flex flex-wrap gap-1.5">
                                 <button
                                   type="button"
-                                  className="rounded border px-1 py-0.5"
+                                  className="rounded-lg border border-sidebar-active/60 px-2 py-1 text-sidebar-text hover:bg-sidebar transition-colors"
                                   onClick={() => handleOpenEditRole(role)}
                                 >
                                   修改
                                 </button>
                                 <button
                                   type="button"
-                                  className="rounded border px-1 py-0.5 text-red-500"
+                                  className="rounded-lg px-2 py-1 text-red-500 hover:bg-red-50 transition-colors"
                                   onClick={() => handleDeleteRole(role.id)}
                                 >
                                   删除
@@ -1034,14 +1029,14 @@ export default function SettingsApp(props: Props) {
 
             {editingRole ? (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                <div className="w-full max-w-xl rounded-xl bg-white p-4 shadow-xl">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="text-sm font-semibold">
+                <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl border border-sidebar-active/40">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-sidebar-text">
                       修改角色（#{editingRole.id}）
                     </div>
                     <button
                       type="button"
-                      className="rounded border px-2 py-1 text-[11px]"
+                      className="rounded-lg border border-sidebar-active/60 px-3 py-1 text-xs text-sidebar-text opacity-70 hover:opacity-100 transition-opacity"
                       onClick={() => setEditingRole(null)}
                       disabled={savingRoleEdit}
                     >
@@ -1051,18 +1046,18 @@ export default function SettingsApp(props: Props) {
 
                   <div className="grid gap-3 md:grid-cols-3">
                     <div>
-                      <label className="mb-1 block text-[11px] text-slate-600">
+                      <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                         角色名称
                       </label>
                       <input
-                        className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        className="w-full rounded-lg border border-sidebar-active/60 bg-sidebar px-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
                         value={editRoleName}
                         onChange={(event) => setEditRoleName(event.target.value)}
                         disabled={savingRoleEdit}
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <div className="mb-1 block text-[11px] text-slate-600">
+                      <div className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                         包含的智能体
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1072,10 +1067,10 @@ export default function SettingsApp(props: Props) {
                             <button
                               key={agent.id}
                               type="button"
-                              className={`rounded px-2 py-1 text-[11px] ${
+                              className={`rounded-lg px-3 py-1.5 text-[11px] transition-colors ${
                                 selected
                                   ? "bg-primary text-white"
-                                  : "bg-slate-100 text-slate-600"
+                                  : "bg-sidebar-active/60 text-sidebar-text hover:bg-sidebar-active"
                               }`}
                               onClick={() =>
                                 handleToggleEditRoleAgent(agent.id)
@@ -1090,10 +1085,10 @@ export default function SettingsApp(props: Props) {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex items-center justify-end gap-2">
+                  <div className="mt-5 flex items-center justify-end gap-2">
                     <button
                       type="button"
-                      className="rounded border px-3 py-1 text-xs"
+                      className="rounded-lg border border-sidebar-active/60 px-4 py-1.5 text-xs text-sidebar-text opacity-70 hover:opacity-100 transition-opacity"
                       onClick={() => setEditingRole(null)}
                       disabled={savingRoleEdit}
                     >
@@ -1101,7 +1096,7 @@ export default function SettingsApp(props: Props) {
                     </button>
                     <button
                       type="button"
-                      className="rounded bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                      className="rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-white hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                       onClick={handleSaveRoleEdit}
                       disabled={savingRoleEdit}
                     >
@@ -1116,25 +1111,25 @@ export default function SettingsApp(props: Props) {
 
         {tab === "ai" ? (
           <div className="space-y-6 text-xs">
-            <div className="rounded border border-slate-200 p-3">
-              <div className="mb-2 font-semibold">AI 配置</div>
+            <div className="rounded-xl border border-sidebar-active/40 bg-sidebar p-4">
+              <div className="mb-3 text-sm font-semibold text-sidebar-text">AI 配置</div>
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-[11px] text-slate-600">
+                  <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                     模型名称
                   </label>
                   <input
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-sidebar-active/60 bg-white px-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
                     value={modelName}
                     onChange={(event) => setModelName(event.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] text-slate-600">
+                  <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                     API Key
                   </label>
                   <input
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-sidebar-active/60 bg-white px-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
                     type="password"
                     value={apiKey}
                     onChange={(event) => setApiKey(event.target.value)}
@@ -1142,13 +1137,13 @@ export default function SettingsApp(props: Props) {
                 </div>
               </div>
               {aiSetting?.updatedAt ? (
-                <div className="mt-2 text-[11px] text-slate-500">
+                <div className="mt-2 text-[11px] text-sidebar-text opacity-50">
                   上次更新时间：{new Date(aiSetting.updatedAt).toLocaleString()}
                 </div>
               ) : null}
               <button
                 type="button"
-                className="mt-3 rounded bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="mt-4 rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-white hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={savingAi}
                 onClick={handleSaveAi}
               >
@@ -1160,26 +1155,26 @@ export default function SettingsApp(props: Props) {
 
         {tab === "prompts" && currentUser.role === "super_admin" ? (
           <div className="space-y-6 text-xs">
-            <div className="rounded border border-slate-200 p-3">
-              <div className="mb-2 font-semibold">提示词配置</div>
-              {loadingPrompts ? <div className="text-slate-500">加载中...</div> : null}
+            <div className="rounded-xl border border-sidebar-active/40 bg-sidebar p-4">
+              <div className="mb-3 text-sm font-semibold text-sidebar-text">提示词配置</div>
+              {loadingPrompts ? <div className="text-sidebar-text opacity-50">加载中...</div> : null}
               {!loadingPrompts && agentPrompts ? (
                 <div className="space-y-4">
                   {agentPrompts.map((item) => (
-                    <div key={item.slug} className="rounded border border-slate-200 p-3">
-                      <div className="mb-2 flex items-center justify-between gap-3">
+                    <div key={item.slug} className="rounded-xl border border-sidebar-active/40 bg-white p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-semibold text-slate-800 truncate">
+                          <div className="font-semibold text-sidebar-text truncate">
                             {item.name}
                           </div>
-                          <div className="text-[11px] text-slate-500 truncate">
+                          <div className="text-[11px] text-sidebar-text opacity-50 truncate">
                             {item.slug}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            className="rounded bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                            className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 hover:opacity-100 transition-opacity"
                             disabled={savingPromptSlug === item.slug}
                             onClick={() =>
                               setAgentPromptDraft((prev) => ({
@@ -1192,7 +1187,7 @@ export default function SettingsApp(props: Props) {
                           </button>
                           <button
                             type="button"
-                            className="rounded bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                             disabled={savingPromptSlug === item.slug}
                             onClick={() => handleSavePrompt(item.slug)}
                           >
@@ -1201,7 +1196,7 @@ export default function SettingsApp(props: Props) {
                         </div>
                       </div>
                       <textarea
-                        className="w-full min-h-[220px] rounded border border-slate-300 px-2 py-2 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary font-mono"
+                        className="w-full min-h-[220px] rounded-lg border border-sidebar-active/60 bg-sidebar px-3 py-2 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30 font-mono"
                         value={agentPromptDraft[item.slug] ?? ""}
                         onChange={(event) =>
                           setAgentPromptDraft((prev) => ({
@@ -1220,43 +1215,32 @@ export default function SettingsApp(props: Props) {
 
         {tab === "theme" ? (
           <div className="space-y-6 text-xs">
-            <div className="rounded border border-slate-200 p-3">
-              <div className="mb-2 font-semibold text-sm">选择界面风格</div>
-              <div className="grid gap-6 md:grid-cols-3">
-                <div 
-                  className={`cursor-pointer rounded border-2 p-4 transition-all ${
-                    theme === "orange" ? "border-primary bg-primary-light" : "border-slate-200 hover:border-slate-300"
-                  }`}
-                  onClick={() => setTheme("orange")}
-                >
-                  <div className="mb-3 h-12 w-full rounded bg-[#E85D22]"></div>
-                  <div className="font-semibold">爱马仕橙</div>
-                  <div className="mt-1 text-[11px] text-slate-500">以橙色为主色调，彰显活力与尊贵</div>
-                </div>
-                <div 
-                  className={`cursor-pointer rounded border-2 p-4 transition-all ${
-                    theme === "blue" ? "border-primary bg-primary-light" : "border-slate-200 hover:border-slate-300"
-                  }`}
-                  onClick={() => setTheme("blue")}
-                >
-                  <div className="mb-3 h-12 w-full rounded bg-[#0284c7]"></div>
-                  <div className="font-semibold">经典蓝色</div>
-                  <div className="mt-1 text-[11px] text-slate-500">以蓝色为主色调，简约专业且稳重</div>
-                </div>
-                <div 
-                  className={`cursor-pointer rounded border-2 p-4 transition-all ${
-                    theme === "green" ? "border-primary bg-primary-light" : "border-slate-200 hover:border-slate-300"
-                  }`}
-                  onClick={() => setTheme("green")}
-                >
-                  <div className="mb-3 h-12 w-full rounded bg-[#07C160]"></div>
-                  <div className="font-semibold">微信绿色</div>
-                  <div className="mt-1 text-[11px] text-slate-500">以绿色为主色调，亲和力强且舒适</div>
-                </div>
+            <div className="rounded-xl border border-sidebar-active/40 bg-sidebar p-4">
+              <div className="mb-4 text-sm font-semibold text-sidebar-text">选择界面风格</div>
+              <div className="grid gap-4 md:grid-cols-3">
+                {[
+                  { id: "orange", label: "爱马仕橙", color: "#E85D22", desc: "以橙色为主色调，彰显活力与尊贵" },
+                  { id: "blue",   label: "人文暖色", color: "#2D2D2D", desc: "以暖奶油为底色，精致内敛且高雅" },
+                  { id: "green",  label: "微信绿色", color: "#07C160", desc: "以绿色为主色调，亲和力强且舒适" },
+                ].map((t) => (
+                  <div
+                    key={t.id}
+                    className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                      theme === t.id
+                        ? "border-primary bg-primary-light"
+                        : "border-sidebar-active/40 hover:border-sidebar-active"
+                    }`}
+                    onClick={() => setTheme(t.id)}
+                  >
+                    <div className="mb-3 h-10 w-full rounded-lg" style={{ backgroundColor: t.color }}></div>
+                    <div className="font-semibold text-sidebar-text">{t.label}</div>
+                    <div className="mt-1 text-[11px] text-sidebar-text opacity-50">{t.desc}</div>
+                  </div>
+                ))}
               </div>
               <button
                 type="button"
-                className="mt-6 rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="mt-6 rounded-lg bg-primary px-5 py-2 text-xs font-medium text-white hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={savingAi}
                 onClick={handleSaveAi}
               >
@@ -1267,47 +1251,45 @@ export default function SettingsApp(props: Props) {
         ) : null}
 
         {tab === "logs" ? (
-          <div className="space-y-3 text-[11px]">
+          <div className="space-y-4 text-[11px]">
             <div className="flex items-center justify-between">
-              <div className="font-semibold">操作记录（最近 100 条）</div>
+              <div className="text-sm font-semibold text-sidebar-text">操作记录（最近 100 条）</div>
               <button
                 type="button"
-                className="rounded border px-2 py-1"
+                className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar transition-all"
                 onClick={handleReloadLogs}
                 disabled={loadingLogs}
               >
                 {loadingLogs ? "刷新中..." : "刷新"}
               </button>
             </div>
-            <div className="overflow-x-auto rounded border border-slate-200">
+            <div className="overflow-x-auto rounded-xl border border-sidebar-active/40">
               <table className="min-w-full border-collapse">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="border-b px-2 py-1 text-left">时间</th>
-                    <th className="border-b px-2 py-1 text-left">用户</th>
-                    <th className="border-b px-2 py-1 text-left">动作</th>
-                    <th className="border-b px-2 py-1 text-left">对象</th>
-                    <th className="border-b px-2 py-1 text-left">详情</th>
+                <thead>
+                  <tr className="bg-sidebar">
+                    <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">时间</th>
+                    <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">用户</th>
+                    <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">动作</th>
+                    <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">对象</th>
+                    <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">详情</th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.map((log) => (
-                    <tr key={log.id} className="odd:bg-white even:bg-slate-50">
-                      <td className="border-b px-2 py-1">
+                    <tr key={log.id} className="border-b border-sidebar-active/20 hover:bg-sidebar/40 transition-colors">
+                      <td className="px-3 py-2 text-sidebar-text opacity-60">
                         {new Date(log.created_at).toLocaleString()}
                       </td>
-                      <td className="border-b px-2 py-1">
+                      <td className="px-3 py-2 font-medium text-sidebar-text">
                         {log.username ?? "-"}
                       </td>
-                      <td className="border-b px-2 py-1">{log.action}</td>
-                      <td className="border-b px-2 py-1">
+                      <td className="px-3 py-2 text-sidebar-text">{log.action}</td>
+                      <td className="px-3 py-2 text-sidebar-text opacity-70">
                         {log.target_type ?? "-"}
                         {log.target_id ? `#${log.target_id}` : ""}
                       </td>
-                      <td className="border-b px-2 py-1">
-                        {log.metadata
-                          ? JSON.stringify(log.metadata)
-                          : "-"}
+                      <td className="px-3 py-2 text-sidebar-text opacity-60 max-w-xs truncate">
+                        {log.metadata ? JSON.stringify(log.metadata) : "-"}
                       </td>
                     </tr>
                   ))}
@@ -1319,17 +1301,17 @@ export default function SettingsApp(props: Props) {
 
         {tab === "course-rules" ? (
           <div className="space-y-6 text-xs">
-            <div className="rounded border border-slate-200 p-3">
-              <div className="mb-2 font-semibold">
+            <div className="rounded-xl border border-sidebar-active/40 bg-sidebar p-4">
+              <div className="mb-3 text-sm font-semibold text-sidebar-text">
                 {editingCourseRule ? "编辑课纲规则" : "增加课纲规则"}
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 <div>
-                  <label className="mb-1 block text-[11px] text-slate-600">
+                  <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                     课纲规则名称
                   </label>
                   <input
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-sidebar-active/60 bg-white px-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
                     value={editingCourseRule ? editingCourseRule.name : newCourseRule.name}
                     onChange={(event) =>
                       editingCourseRule
@@ -1339,12 +1321,12 @@ export default function SettingsApp(props: Props) {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] text-slate-600">
+                  <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                     课纲节数
                   </label>
                   <input
                     type="number"
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-sidebar-active/60 bg-white px-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
                     value={editingCourseRule ? editingCourseRule.lesson_count : newCourseRule.lesson_count}
                     onChange={(event) =>
                       editingCourseRule
@@ -1354,11 +1336,11 @@ export default function SettingsApp(props: Props) {
                   />
                 </div>
                 <div className="md:col-span-3">
-                  <label className="mb-1 block text-[11px] text-slate-600">
+                  <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
                     课纲规则字段数据
                   </label>
                   <textarea
-                    className="w-full h-32 rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary font-mono"
+                    className="w-full h-32 rounded-lg border border-sidebar-active/60 bg-white px-3 py-2 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30 font-mono"
                     value={editingCourseRule ? editingCourseRule.rule_content : newCourseRule.rule_content}
                     onChange={(event) =>
                       editingCourseRule
@@ -1368,10 +1350,10 @@ export default function SettingsApp(props: Props) {
                   />
                 </div>
               </div>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-4 flex gap-2">
                 <button
                   type="button"
-                  className="rounded bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-white hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                   disabled={creatingCourseRule || savingCourseRuleEdit}
                   onClick={editingCourseRule ? handleSaveCourseRuleEdit : handleCreateCourseRule}
                 >
@@ -1380,7 +1362,7 @@ export default function SettingsApp(props: Props) {
                 {editingCourseRule && (
                   <button
                     type="button"
-                    className="rounded border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                    className="rounded-lg border border-sidebar-active/60 px-4 py-1.5 text-xs text-sidebar-text opacity-70 hover:opacity-100 transition-opacity"
                     onClick={() => setEditingCourseRule(null)}
                   >
                     取消修改
@@ -1390,51 +1372,50 @@ export default function SettingsApp(props: Props) {
             </div>
 
             <div>
-              <div className="mb-2 font-semibold">课纲规则列表</div>
-              <div className="overflow-x-auto rounded border border-slate-200">
+              <div className="mb-3 text-sm font-semibold text-sidebar-text">课纲规则列表</div>
+              <div className="overflow-x-auto rounded-xl border border-sidebar-active/40">
                 <table className="min-w-full border-collapse text-[11px]">
-                  <thead className="bg-slate-100">
-                    <tr>
-                      <th className="border-b px-2 py-1 text-left">ID</th>
-                      <th className="border-b px-2 py-1 text-left">名称</th>
-                      <th className="border-b px-2 py-1 text-left">节数</th>
-                      <th className="border-b px-2 py-1 text-left">规则数据</th>
-                      <th className="border-b px-2 py-1 text-left">创建时间</th>
-                      <th className="border-b px-2 py-1 text-left">操作</th>
+                  <thead>
+                    <tr className="bg-sidebar">
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">ID</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">名称</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">节数</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">规则数据</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">创建时间</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loadingCourseRules ? (
                       <tr>
-                        <td colSpan={6} className="px-2 py-4 text-center text-slate-500">
+                        <td colSpan={6} className="px-3 py-4 text-center text-sidebar-text opacity-50">
                           加载中...
                         </td>
                       </tr>
                     ) : courseRules.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-2 py-4 text-center text-slate-500">
+                        <td colSpan={6} className="px-3 py-4 text-center text-sidebar-text opacity-50">
                           暂无数据
                         </td>
                       </tr>
                     ) : (
                       courseRules.map((rule) => (
-                        <tr key={rule.id} className="odd:bg-white even:bg-slate-50">
-                          <td className="border-b px-2 py-1">{rule.id}</td>
-                          <td className="border-b px-2 py-1">{rule.name}</td>
-                          <td className="border-b px-2 py-1">{rule.lesson_count}</td>
-                          <td className="border-b px-2 py-1 max-w-xs truncate" title={rule.rule_content}>
+                        <tr key={rule.id} className="border-b border-sidebar-active/20 hover:bg-sidebar/40 transition-colors">
+                          <td className="px-3 py-2 text-sidebar-text opacity-60">{rule.id}</td>
+                          <td className="px-3 py-2 font-medium text-sidebar-text">{rule.name}</td>
+                          <td className="px-3 py-2 text-sidebar-text">{rule.lesson_count}</td>
+                          <td className="px-3 py-2 max-w-xs truncate text-sidebar-text opacity-60" title={rule.rule_content}>
                             {rule.rule_content}
                           </td>
-                          <td className="border-b px-2 py-1">
+                          <td className="px-3 py-2 text-sidebar-text opacity-60">
                             {new Date(rule.created_at).toLocaleString()}
                           </td>
-                          <td className="border-b px-2 py-1">
+                          <td className="px-3 py-2">
                             <button
                               type="button"
-                              className="rounded border px-1 py-0.5 text-primary border-primary hover:bg-primary hover:text-white transition-colors"
+                              className="rounded-lg border border-sidebar-active/60 px-2 py-1 text-sidebar-text hover:bg-sidebar transition-colors"
                               onClick={() => {
                                 setEditingCourseRule(rule);
-                                // 滚动到顶部
                                 const container = document.querySelector('.overflow-y-auto');
                                 if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
                               }}

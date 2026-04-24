@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { signOut } from "next-auth/react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
@@ -1599,39 +1600,32 @@ export default function ChatApp(props: Props) {
     <div className="flex h-screen overflow-hidden bg-white">
       {/* 桌面端侧边栏 */}
       <div
-        className={`bg-sidebar text-sidebar-text hidden h-screen flex-col border-r border-slate-200/10 shadow-lg md:flex ${
+        className={`bg-sidebar text-sidebar-text hidden h-screen flex-col border-r border-sidebar-active/40 md:flex ${
           sidebarCollapsed ? "w-16" : ""
-        } relative transition-all duration-300 ease-in-out overflow-hidden`}
+        } relative transition-all duration-300 ease-in-out overflow-hidden rounded-tr-[40px] rounded-br-[40px]`}
         style={sidebarCollapsed ? undefined : { width: sidebarWidth }}
       >
-        <div className="flex flex-none items-center justify-between px-4 py-4 border-b border-white/5">
-          <div className="text-sm font-bold tracking-wider">策划大师</div>
-          <button
-            type="button"
-            className="rounded-full p-1.5 hover:bg-sidebar-hover transition-colors"
-            onClick={() => setSidebarCollapsed((prev) => !prev)}
-          >
-            {sidebarCollapsed ? "»" : "«"}
-          </button>
+        <div className="flex flex-none items-center justify-between px-5 py-5 border-b border-sidebar-active/40">
+          <Link href="/" className="text-base font-bold tracking-wide hover:opacity-70 transition-opacity">策划大师</Link>
         </div>
         {!sidebarCollapsed ? (
-          <div className="flex-1 overflow-y-scroll min-h-0 py-4 custom-scrollbar">
-            <div className="px-4">
-              <div className="mb-3 text-[10px] font-semibold uppercase tracking-widest opacity-40">智能体</div>
-              <div className="space-y-1.5">
+          <div className="flex-1 overflow-y-scroll min-h-0 py-5 custom-scrollbar">
+            <div className="px-5">
+              <div className="mb-3 text-[10px] font-semibold uppercase tracking-widest opacity-50">智能体</div>
+              <div className="space-y-0.5">
                 {agents.map((agent) => (
                   <button
                     key={agent.id}
                     type="button"
                     disabled={sending}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs transition-all duration-200 ${
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
                       selectedAgentId === agent.id
-                        ? "bg-sidebar-active shadow-sm"
+                        ? "bg-sidebar-active font-medium"
                         : "hover:bg-sidebar-hover"
                     }`}
                     onClick={() => handleSelectAgent(agent.id)}
                   >
-                    <span className="flex min-w-0 items-center gap-2">
+                    <span className="flex min-w-0 items-center gap-2.5">
                       <AgentMenuIcon slug={agent.slug} />
                       <span className="truncate">{agent.name}</span>
                     </span>
@@ -1639,25 +1633,25 @@ export default function ChatApp(props: Props) {
                 ))}
               </div>
             </div>
-            <div className="mt-8 px-4 pb-4">
+            <div className="mt-8 px-5 pb-4">
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-widest opacity-40">对话历史</span>
+                <span className="text-[10px] font-semibold uppercase tracking-widest opacity-50">对话历史</span>
                 <button
                   type="button"
-                  className="rounded-md bg-sidebar-active px-2.5 py-1 text-[10px] font-medium hover:bg-sidebar-hover transition-all active:scale-95"
+                  className="rounded-md border border-sidebar-active px-2.5 py-1 text-[10px] font-medium hover:bg-sidebar-active transition-all active:scale-95"
                   onClick={handleNewConversation}
                 >
                   新建
                 </button>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {conversations.map((conversation) => (
                   <button
                     key={conversation.id}
                     type="button"
                     className={`w-full rounded-lg px-3 py-2.5 text-left text-xs transition-all duration-200 group ${
                       currentConversationId === conversation.id
-                        ? "bg-sidebar-active shadow-sm"
+                        ? "bg-sidebar-active"
                         : "hover:bg-sidebar-hover"
                     }`}
                     onClick={() =>
@@ -1733,17 +1727,17 @@ export default function ChatApp(props: Props) {
             </div>
           </div>
         ) : null}
-        <div className="flex-none border-t border-white/5 bg-black/5 px-4 py-4 text-xs">
+        <div className="flex-none border-t border-sidebar-active/40 px-5 py-4 text-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm">
-                {user.username.charAt(0).toUpperCase()}
+              <div className="h-9 w-9 rounded-full bg-sidebar-active flex items-center justify-center font-bold text-sm" style={{color: 'var(--sidebar-text)'}}>
+                {user.username.slice(0, 2).toUpperCase()}
               </div>
               <div className="flex flex-col">
                 <span className="font-semibold text-sidebar">{user.username}</span>
                 <button
                   type="button"
-                  className="text-[10px] text-left opacity-40 hover:opacity-100 transition-opacity"
+                  className="text-[10px] text-left opacity-50 hover:opacity-100 transition-opacity"
                   onClick={() => {
                     void cleanupCurrentConversationIfEmpty();
                     window.location.href = "/account/password";
@@ -1755,11 +1749,11 @@ export default function ChatApp(props: Props) {
             </div>
             <button
               type="button"
-              className="rounded-lg bg-sidebar-hover p-2 hover:bg-sidebar-active transition-colors"
+              className="rounded-lg p-2 hover:bg-sidebar-active transition-colors opacity-50 hover:opacity-100"
               onClick={handleLogout}
               title="退出登录"
             >
-              <svg className="h-4 w-4 opacity-60 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
             </button>
@@ -1767,7 +1761,7 @@ export default function ChatApp(props: Props) {
           {(user.role === "admin" || user.role === "super_admin") && (
             <button
               type="button"
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-xs font-semibold text-white shadow-md hover:bg-primary-hover transition-all active:scale-[0.98]"
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-sidebar-active py-2.5 text-xs font-medium hover:bg-sidebar-active transition-all active:scale-[0.98]"
               onClick={() => {
                 void cleanupCurrentConversationIfEmpty();
                 window.location.href = "/settings";
@@ -1950,21 +1944,21 @@ export default function ChatApp(props: Props) {
           </div>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex items-center justify-between border-b px-4 py-2">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#f3efe9]">
+          <div className="flex items-center justify-between rounded-bl-[28px] border-b border-[#ded7cc] bg-[#faf8f4] px-6 py-3">
             <div className="flex flex-col">
-              <div className="text-sm font-semibold">
+              <div className="text-base font-semibold text-sidebar-text">
                 {currentConversation?.title || "开始新的对话"}
               </div>
               {currentAgent ? (
-                <div className="mt-1 text-xs text-slate-500">
+                <div className="mt-0.5 text-xs text-sidebar-text opacity-50">
                   当前智能体：{currentAgent.name}
                 </div>
               ) : null}
             </div>
-            <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-2 text-xs">
               {(user.role === "admin" || user.role === "super_admin") ? (
-                <label className="flex items-center gap-1 text-slate-500">
+                <label className="flex items-center gap-1.5 text-sidebar-text opacity-60 cursor-pointer hover:opacity-100 transition-opacity">
                   <input
                     type="checkbox"
                     className="h-3 w-3"
@@ -1976,7 +1970,7 @@ export default function ChatApp(props: Props) {
               ) : null}
               <button
                 type="button"
-                className="rounded border px-2 py-1"
+                className="rounded-lg border border-sidebar-active px-3 py-1.5 text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar-active transition-all disabled:opacity-30"
                 onClick={handleClearConversation}
                 disabled={!currentConversationId}
               >
@@ -1984,7 +1978,7 @@ export default function ChatApp(props: Props) {
               </button>
               <button
                 type="button"
-                className="rounded border px-2 py-1"
+                className="rounded-lg border border-sidebar-active px-3 py-1.5 text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar-active transition-all disabled:opacity-30"
                 onClick={handleExportConversation}
                 disabled={!currentConversationId || messages.length === 0}
               >
@@ -1993,10 +1987,10 @@ export default function ChatApp(props: Props) {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-scroll px-4 py-4 custom-scrollbar">
-            <div className="mx-auto w-full max-w-2xl">
+          <div className="min-h-0 flex-1 overflow-y-scroll rounded-tl-[28px] px-6 py-6 custom-scrollbar bg-[#f3efe9]">
+            <div className="mx-auto w-full max-w-4xl">
             {error ? (
-              <div className="mb-3 rounded bg-red-50 px-3 py-2 text-xs text-red-600">
+              <div className="mb-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-xs text-red-600">
                 {error}
                 <button
                   type="button"
@@ -2008,17 +2002,17 @@ export default function ChatApp(props: Props) {
               </div>
             ) : null}
             {generatingConversationId === currentConversationId ? (
-              <div className="mb-3 rounded bg-sky-50 px-3 py-2 text-xs text-sky-700">
+              <div className="mb-4 rounded-xl bg-sky-50 border border-sky-100 px-4 py-3 text-xs text-sky-700">
                 任务已提交，正在生成结果，请稍候...
               </div>
             ) : null}
 
             {loadingMessages ? (
-              <div className="text-xs text-slate-500">加载中...</div>
+              <div className="text-xs text-slate-400">加载中...</div>
             ) : null}
 
             {!loadingMessages && messages.length === 0 ? (
-              <div className="mt-8 text-center text-sm text-slate-500">
+              <div className="mt-12 text-center text-sm text-slate-400">
                 {currentAgent?.slug === "product-one-pager"
                   ? '我是一位大健康产品策划顾问，专门帮助产品团队梳理"产品基本信息一页纸"，可以输入：开始'
                   : "还没有消息，输入内容开始对话"}
@@ -2044,33 +2038,29 @@ export default function ChatApp(props: Props) {
                         : "justify-start"
                     }`}
                   >
-                    <div className="w-full space-y-1">
+                    <div className={`space-y-1 ${message.role === "user" ? "max-w-[75%]" : "w-full"}`}>
                       <div
                         ref={(node) => {
                           if (message.id === lastAssistantId) {
                             lastAssistantContentRef.current = node;
                           }
                         }}
-                        className={`w-full max-h-[70vh] overflow-y-scroll rounded px-3 py-2 text-sm custom-scrollbar ${
+                        className={`max-h-[70vh] overflow-y-scroll text-sm custom-scrollbar ${
                           message.role === "user"
-                            ? "bg-primary text-white"
-                            : "bg-slate-100 text-slate-900"
+                            ? "px-4 py-3 rounded-[28px] bg-sidebar-active text-sidebar-text"
+                            : "w-full px-5 py-4 rounded-[28px] bg-white shadow-sm border border-black/5 text-slate-800"
                         }`}
                       >
-                        <div className="mb-1 flex items-center justify-between text-[11px] opacity-70">
-                          <span>
-                            {message.role === "user" ? "我" : "AI"}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {message.role === "assistant" &&
-                            (currentAgent?.slug === "nine-grid" ||
+                        {message.role === "assistant" && (
+                          <div className="mb-2 flex items-center justify-end gap-3 text-[11px] text-slate-400">
+                            {(currentAgent?.slug === "nine-grid" ||
                               currentAgent?.slug === "positioning-helper" ||
                               currentAgent?.slug === "four-things" ||
                               currentAgent?.slug === "product-one-pager" ||
                               currentAgent?.slug === "course-outline") ? (
                               <button
                                 type="button"
-                                className="underline"
+                                className="hover:text-slate-700 transition-colors"
                                 onClick={() => handleOpenSaveResult(message)}
                               >
                                 保存
@@ -2078,28 +2068,27 @@ export default function ChatApp(props: Props) {
                             ) : null}
                             <button
                               type="button"
-                              className="underline"
+                              className="hover:text-slate-700 transition-colors"
                               onClick={() => handleCopy(message)}
                             >
-                              复制
+                              点击复制内容
                             </button>
-                            {message.role === "assistant" &&
-                            message.id === lastAssistantId ? (
+                            {message.id === lastAssistantId ? (
                               <button
                                 type="button"
-                                className="underline"
+                                className="hover:text-slate-700 transition-colors"
                                 onClick={() => handleCopyVisibleResult(message)}
                               >
                                 结果拷贝
                               </button>
                             ) : null}
                           </div>
-                        </div>
+                        )}
                         <div
-                          className={`prose prose-base max-w-none prose-headings:font-bold prose-p:leading-loose prose-p:my-4 prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg ${
+                          className={`prose prose-sm max-w-none prose-headings:font-bold prose-p:leading-relaxed prose-p:my-3 prose-h1:text-xl prose-h2:text-lg prose-h3:text-base ${
                             message.role === "user"
-                              ? "prose-headings:text-white prose-p:text-white prose-strong:text-white prose-li:marker:text-white/70 text-white"
-                              : "prose-headings:text-slate-900 prose-li:marker:text-slate-500"
+                              ? "prose-headings:text-sidebar-text prose-p:text-sidebar-text text-sidebar-text"
+                              : "prose-headings:text-slate-800 prose-li:marker:text-slate-400 text-slate-700"
                           }`}
                         >
                           <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
@@ -2126,9 +2115,9 @@ export default function ChatApp(props: Props) {
             </div>
           </div>
 
-          <div className="border-t px-4 py-3">
-            <div className="mx-auto w-full max-w-2xl">
-            <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="border-t border-[#e7dfd5] rounded-tl-[36px] rounded-tr-[36px] bg-[#f8f5f1] px-6 py-4">
+            <div className="mx-auto w-full max-w-4xl">
+            <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-wider text-sidebar-text opacity-40">
               <span>Enter 发送，Shift+Enter 换行</span>
               <div className="flex items-center gap-3">
                 {sending ? <span>发送中...</span> : null}
@@ -2142,7 +2131,7 @@ export default function ChatApp(props: Props) {
                   currentAgent?.slug === "course-transcript") ? (
                   <button
                     type="button"
-                    className="underline"
+                    className="underline normal-case text-[11px] opacity-100"
                     onClick={handleOpenReferenceData}
                   >
                     引用数据
@@ -2151,8 +2140,8 @@ export default function ChatApp(props: Props) {
               </div>
             </div>
             <textarea
-              className="w-full min-h-24 max-h-60 overflow-y-scroll resize-none rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary custom-scrollbar"
-              placeholder="输入消息..."
+              className="w-full min-h-24 max-h-60 overflow-y-scroll resize-none rounded-2xl border border-sidebar-active/60 bg-white px-4 py-3 text-sm text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30 custom-scrollbar placeholder:text-sidebar-text/30"
+              placeholder="您可以输入您的需求，让AI为您生成..."
               value={currentInput}
               disabled={sending}
               onChange={(event) => {
@@ -2164,8 +2153,8 @@ export default function ChatApp(props: Props) {
               }}
               onKeyDown={handleKeyDown}
             />
-            <div className="mt-2 flex items-center justify-between">
-              <div className="text-xs text-slate-500">
+            <div className="mt-3 flex items-center justify-between">
+              <div className="text-xs text-slate-400">
                 {sending
                   ? "正在发送..."
                   : generatingConversationId === currentConversationId
@@ -2176,7 +2165,7 @@ export default function ChatApp(props: Props) {
                 {sending ? (
                   <button
                     type="button"
-                    className="rounded border px-3 py-1 text-xs"
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
                     onClick={() => setSending(false)}
                   >
                     停止生成
@@ -2184,7 +2173,7 @@ export default function ChatApp(props: Props) {
                 ) : null}
                 <button
                   type="button"
-                  className="rounded bg-primary px-4 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="rounded-xl bg-primary px-6 py-2 text-sm font-medium text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={handleSend}
                   disabled={
                     sending ||
@@ -2201,7 +2190,7 @@ export default function ChatApp(props: Props) {
               </div>
             </div>
             {!currentConversationId ? (
-              <div className="mt-2 text-xs text-slate-500">
+              <div className="mt-2 text-xs text-slate-400">
                 请选择智能体并输入内容开始新的对话
               </div>
             ) : null}

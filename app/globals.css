@@ -3,14 +3,14 @@
 @tailwind utilities;
 
 :root, .blue {
-  --primary-color: #0284c7;
-  --primary-hover-color: #0369a1;
-  --primary-light-color: #f0f9ff;
+  --primary-color: #5F6F67;
+  --primary-hover-color: #4A5750;
+  --primary-light-color: #F5F0EB;
   --primary-text: #ffffff;
-  --sidebar-bg: #0f172a;
-  --sidebar-text: #f8fafc;
-  --sidebar-hover: #1e293b;
-  --sidebar-active: #334155;
+  --sidebar-bg: #F5F0EB;
+  --sidebar-text: #2C2416;
+  --sidebar-hover: #EAE3D8;
+  --sidebar-active: #D4C9B8;
 }
 
 .orange {
@@ -65,13 +65,13 @@
 
   /* 针对侧边栏的特殊滚动条样式 */
   .bg-sidebar .custom-scrollbar {
-    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
   }
   .bg-sidebar .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.1);
   }
   .bg-sidebar .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.2);
   }
 }
 

@@ -12,7 +12,7 @@ export async function PUT(
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
     await query(
-      "UPDATE course_rules SET rule_name = ?, lesson_count = ?, rule_content = ? WHERE id = ?",
+      "UPDATE course_rules SET name = ?, lesson_count = ?, rule_content = ? WHERE id = ?",
       [name, lesson_count, rule_content, id]
     );
     return NextResponse.json({ message: "Course rule updated successfully" });
