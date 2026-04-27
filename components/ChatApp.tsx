@@ -234,6 +234,92 @@ function formatMarkdownForCopy(text: string) {
   return processed;
 }
 
+function buildFeishuClipboardHtml(sourceElement: HTMLElement) {
+  const sanitizeNode = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent ?? "";
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return "";
+    }
+
+    const element = node as HTMLElement;
+    const tag = element.tagName.toLowerCase();
+    const children = Array.from(element.childNodes)
+      .map((child) => sanitizeNode(child))
+      .join("");
+
+    if (tag === "h1") {
+      return `<h1 style="margin:16px 0 12px;font-size:24px;line-height:1.4;font-weight:700;">${children}</h1>`;
+    }
+    if (tag === "h2") {
+      return `<h2 style="margin:14px 0 10px;font-size:20px;line-height:1.5;font-weight:700;">${children}</h2>`;
+    }
+    if (tag === "h3") {
+      return `<h3 style="margin:12px 0 8px;font-size:18px;line-height:1.6;font-weight:700;">${children}</h3>`;
+    }
+    if (tag === "p") {
+      return `<p style="margin:10px 0;line-height:1.8;">${children || "<br />"}</p>`;
+    }
+    if (tag === "strong" || tag === "b") {
+      return `<strong style="font-weight:700;">${children}</strong>`;
+    }
+    if (tag === "em" || tag === "i") {
+      return `<em>${children}</em>`;
+    }
+    if (tag === "ul") {
+      return `<ul style="margin:10px 0 10px 22px;padding:0;list-style:disc;">${children}</ul>`;
+    }
+    if (tag === "ol") {
+      return `<ol style="margin:10px 0 10px 22px;padding:0;list-style:decimal;">${children}</ol>`;
+    }
+    if (tag === "li") {
+      return `<li style="margin:4px 0;line-height:1.8;">${children}</li>`;
+    }
+    if (tag === "hr") {
+      return '<hr style="border:none;border-top:1px solid #d1d5db;margin:16px 0;" />';
+    }
+    if (tag === "blockquote") {
+      return `<blockquote style="margin:12px 0;padding:8px 12px;border-left:4px solid #d1d5db;color:#4b5563;background:#f9fafb;">${children}</blockquote>`;
+    }
+    if (tag === "pre") {
+      const content = element.textContent ?? "";
+      return `<pre style="white-space:pre-wrap;margin:12px 0;padding:12px;border-radius:8px;background:#f3f4f6;color:#111827;font-size:13px;line-height:1.7;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">${content}</pre>`;
+    }
+    if (tag === "code") {
+      return `<code style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:#f3f4f6;padding:1px 4px;border-radius:4px;">${children}</code>`;
+    }
+    if (tag === "br") {
+      return "<br />";
+    }
+    if (tag === "a") {
+      const href = element.getAttribute("href");
+      if (href) {
+        return `<a href="${href}" style="color:#2563eb;text-decoration:underline;">${children}</a>`;
+      }
+      return children;
+    }
+
+    return children;
+  };
+
+  const fragment = Array.from(sourceElement.childNodes)
+    .map((node) => sanitizeNode(node))
+    .join("");
+
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body>
+    <!--StartFragment-->
+    <div style="color:#1f2937;font-size:14px;line-height:1.75;">${fragment}</div>
+    <!--EndFragment-->
+  </body>
+</html>`;
+}
+
 const PENDING_PREFIX = "正在生成，请稍候...";
 const VIRTUAL_CONVERSATION_ID = -1;
 
@@ -1327,7 +1413,26 @@ export default function ChatApp(props: Props) {
   const handleCopyVisibleResult = async (message: Message) => {
     try {
       const text = formatMarkdownForCopy(stripPendingPrefix(message.content));
-      await navigator.clipboard.writeText(text);
+      const renderedNode = document.querySelector(
+        `[data-copy-result-id="${message.id}"]`
+      ) as HTMLElement | null;
+
+      if (
+        renderedNode &&
+        navigator.clipboard &&
+        "write" in navigator.clipboard &&
+        typeof ClipboardItem !== "undefined"
+      ) {
+        const html = buildFeishuClipboardHtml(renderedNode);
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([text], { type: "text/plain" })
+          })
+        ]);
+      } else {
+        await navigator.clipboard.writeText(text);
+      }
       await fetch("/api/operations/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2085,6 +2190,9 @@ export default function ChatApp(props: Props) {
                           </div>
                         )}
                         <div
+                          data-copy-result-id={
+                            message.role === "assistant" ? String(message.id) : undefined
+                          }
                           className={`prose prose-sm max-w-none prose-headings:font-bold prose-p:leading-relaxed prose-p:my-3 prose-h1:text-xl prose-h2:text-lg prose-h3:text-base ${
                             message.role === "user"
                               ? "prose-headings:text-sidebar-text prose-p:text-sidebar-text text-sidebar-text"
