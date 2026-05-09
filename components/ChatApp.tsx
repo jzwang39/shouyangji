@@ -322,12 +322,22 @@ function buildFeishuClipboardHtml(sourceElement: HTMLElement) {
 
 const PENDING_PREFIX = "正在生成，请稍候...";
 const VIRTUAL_CONVERSATION_ID = -1;
+const REVISION_ENABLED_SLUGS = new Set([
+  "positioning-helper",
+  "four-things",
+  "nine-grid",
+  "course-outline"
+]);
 
 function stripPendingPrefix(text: string) {
   const normalized = String(text ?? "").replace(/\r\n/g, "\n");
   if (!normalized.startsWith(PENDING_PREFIX)) return String(text ?? "");
   const rest = normalized.slice(PENDING_PREFIX.length).replace(/^\s+/, "");
   return rest ? rest : PENDING_PREFIX;
+}
+
+function isPendingAssistantContent(text: string) {
+  return stripPendingPrefix(text) === PENDING_PREFIX;
 }
 
 function extractProductOnePagerSaveContent(text: string) {
@@ -338,6 +348,87 @@ function extractProductOnePagerSaveContent(text: string) {
     return source;
   }
   return source.slice(markerIndex).trim();
+}
+
+function isRevisionIntent(input: string) {
+  const text = input.trim();
+  if (!text) return false;
+  const patterns = [
+    /再来一版/,
+    /再出一版/,
+    /再生成/,
+    /重新(来|写|生成)?/,
+    /重写/,
+    /改(一下|下|成|为|成更)?/,
+    /修改/,
+    /调整/,
+    /优化/,
+    /润色/,
+    /补充/,
+    /精简/,
+    /简化/,
+    /细化/,
+    /能不能/,
+    /可以(帮我)?/,
+    /把.+改/
+  ];
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function isLikelyFullInitialInput(input: string) {
+  const text = input.trim();
+  if (!text) return false;
+  if (text.length >= 140) return true;
+  const lineCount = text.split(/\r?\n/).filter((line) => line.trim()).length;
+  if (lineCount >= 4) return true;
+  const markers = [
+    "产品信息",
+    "产品描述",
+    "核心成分",
+    "目标用户",
+    "核心愿景",
+    "解决方案",
+    "核心观点",
+    "关键词",
+    "最终成果",
+    "四件事",
+    "九宫格",
+    "课纲",
+    "课程目标"
+  ];
+  const hitCount = markers.filter((marker) => text.includes(marker)).length;
+  return hitCount >= 2;
+}
+
+function buildRevisionPrompt(params: {
+  agentName: string;
+  userInput: string;
+  lastResult: string;
+  lastPrompt: string;
+  referencedContext: string;
+}) {
+  const { agentName, userInput, lastResult, lastPrompt, referencedContext } = params;
+  return `你是一位资深的大健康营销内容专家。当前任务是修订“${agentName}”智能体的结果。
+请基于“上一版结果 + 客户本次修改意见 + 当前会话引用过的数据 + 对应提示词”，生成一版修订后的完整结果。
+
+严格要求：
+1. 输出必须沿用【上一版结果】的版式和结构（标题名称、层级顺序、分段风格、列表样式都保持一致）。
+2. 只修改客户提出的内容，不要随意改写未被要求修改的部分。
+3. 必须输出完整结果，不要只给“修改建议”或“差异点”。
+4. 若客户意见与旧内容冲突，以客户最新意见为准。
+5. 若客户意见不明确，按最小改动原则修订。
+
+【上一版结果】
+${lastResult}
+
+【客户本次修改意见】
+${userInput}
+
+【当前会话引用过的数据】
+${referencedContext || "（本次会话暂无引用数据）"}
+
+【对应提示词（仅作约束参考，输出结构仍以“上一版结果”为准）】
+${lastPrompt || "（提示词缺失）"}`;
 }
 
 export default function ChatApp(props: Props) {
@@ -409,6 +500,8 @@ export default function ChatApp(props: Props) {
   const [generatingConversationId, setGeneratingConversationId] = useState<
     number | null
   >(null);
+  const [referencedContextByConversation, setReferencedContextByConversation] =
+    useState<Record<number, string>>({});
   const currentConversationIdRef = useRef<number | null>(null);
 
   const getErrorMessage = useCallback((e: any, fallback: string) => {
@@ -630,7 +723,7 @@ export default function ChatApp(props: Props) {
         const pending =
           !!lastAssistant &&
           typeof lastAssistant.content === "string" &&
-          lastAssistant.content.includes("正在生成");
+          isPendingAssistantContent(lastAssistant.content);
         setGeneratingConversationId((prev) => {
           if (pending) return currentConversationId;
           if (prev === currentConversationId) return null;
@@ -962,7 +1055,7 @@ export default function ChatApp(props: Props) {
               continue;
             }
             if (typeof target.content === "string" && target.content.trim()) {
-              if (!target.content.includes("正在生成")) {
+              if (!isPendingAssistantContent(target.content)) {
                 setGeneratingConversationId((prev) =>
                   prev === conversationId ? null : prev
                 );
@@ -992,7 +1085,7 @@ export default function ChatApp(props: Props) {
           setMessages(data);
           const target = data.find((m) => m.id === assistantMessageId);
           if (target && typeof target.content === "string") {
-            if (target.content.trim() && !target.content.includes("正在生成")) {
+            if (target.content.trim() && !isPendingAssistantContent(target.content)) {
               setGeneratingConversationId((prev) =>
                 prev === conversationId ? null : prev
               );
@@ -1018,6 +1111,40 @@ export default function ChatApp(props: Props) {
       return;
     }
     const content = currentInput;
+    const trimmedContent = content.trim();
+    let promptOverride: string | undefined;
+    if (currentAgent && REVISION_ENABLED_SLUGS.has(currentAgent.slug)) {
+      const lastAssistant = [...messages]
+        .reverse()
+        .find((message) => {
+          if (message.role !== "assistant") return false;
+          const normalized = stripPendingPrefix(String(message.content ?? "")).trim();
+          if (!normalized) return false;
+          if (normalized === PENDING_PREFIX) return false;
+          return true;
+        });
+      const shouldUseRevisionMode =
+        !!lastAssistant &&
+        (isRevisionIntent(trimmedContent) ||
+          !isLikelyFullInitialInput(trimmedContent));
+      if (lastAssistant && shouldUseRevisionMode) {
+        const lastResult = stripPendingPrefix(String(lastAssistant.content ?? "")).trim();
+        const lastPrompt = aiPrompts[lastAssistant.id] ?? "";
+        const lookupConversationId =
+          currentConversationId ?? VIRTUAL_CONVERSATION_ID;
+        const referencedContext =
+          referencedContextByConversation[lookupConversationId] ?? "";
+        if (lastResult) {
+          promptOverride = buildRevisionPrompt({
+            agentName: currentAgent.name,
+            userInput: trimmedContent,
+            lastResult,
+            lastPrompt,
+            referencedContext
+          });
+        }
+      }
+    }
     const tempId = -Date.now();
     setMessages((prev) => [
       ...prev,
@@ -1041,6 +1168,14 @@ export default function ChatApp(props: Props) {
           throw new Error(await convRes.text());
         }
         const conv: Conversation = await convRes.json();
+        if (
+          currentAgent &&
+          REVISION_ENABLED_SLUGS.has(currentAgent.slug) &&
+          referencedContextByConversation[VIRTUAL_CONVERSATION_ID]
+        ) {
+          const value = referencedContextByConversation[VIRTUAL_CONVERSATION_ID];
+          setReferencedContextByConversation((prev) => ({ ...prev, [conv.id]: value }));
+        }
         conversationId = conv.id;
         setConversations((prev) => [conv, ...prev]);
         setCurrentConversationId(conv.id);
@@ -1060,7 +1195,11 @@ export default function ChatApp(props: Props) {
             "Content-Type": "application/json",
             Accept: "text/event-stream"
           },
-          body: JSON.stringify({ content, stream: true })
+          body: JSON.stringify({
+            content,
+            stream: true,
+            promptOverride
+          })
         }
       );
       if (!res.ok) {
@@ -1488,7 +1627,7 @@ export default function ChatApp(props: Props) {
     }
     const pending =
       typeof lastAssistant.content === "string" &&
-      lastAssistant.content.includes("正在生成");
+      isPendingAssistantContent(lastAssistant.content);
     if (!pending) {
       setGeneratingConversationId((prev) =>
         prev === currentConversationId ? null : prev
@@ -2768,6 +2907,19 @@ export default function ChatApp(props: Props) {
                         setCurrentInput(text);
                         if (currentConversationId) {
                           saveDraft(currentConversationId, text);
+                        }
+                        if (
+                          currentAgent &&
+                          REVISION_ENABLED_SLUGS.has(currentAgent.slug)
+                        ) {
+                          const referencedContext = text.trim();
+                          if (referencedContext) {
+                            const key = currentConversationId ?? VIRTUAL_CONVERSATION_ID;
+                            setReferencedContextByConversation((prev) => ({
+                              ...prev,
+                              [key]: referencedContext
+                            }));
+                          }
                         }
                       }
                       setReferenceDialogOpen(false);
