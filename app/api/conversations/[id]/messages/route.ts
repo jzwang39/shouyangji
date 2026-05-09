@@ -12,6 +12,7 @@ type Params = {
 };
 
 const PENDING_PREFIX = "正在生成，请稍候...";
+const EMPTY_AI_REPLY_FALLBACK = "【系统提示】本次生成未返回内容，请重试。";
 
 const AI_AGENT_SLUGS = new Set([
   "positioning-helper",
@@ -332,6 +333,9 @@ ${content}`;
                 if (finalText && finalText !== fullText) {
                   fullText = finalText;
                 }
+                if (!fullText.trim()) {
+                  fullText = EMPTY_AI_REPLY_FALLBACK;
+                }
                 send({ type: "final", content: fullText });
 
                 await query(
@@ -409,6 +413,9 @@ ${content}`;
         let isError = false;
         try {
           aiText = await callAiWithPrompt(prompt, { messages: aiMessages });
+          if (!String(aiText ?? "").trim()) {
+            aiText = EMPTY_AI_REPLY_FALLBACK;
+          }
         } catch (e: any) {
           let message = "";
           if (typeof e?.message === "string" && e.message) {

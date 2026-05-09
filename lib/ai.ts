@@ -1320,19 +1320,20 @@ export function buildPositioningPrompt(description: string) {
 }
 
 function getDefaultPromptTemplate(slug: string) {
-  if (slug === "product-one-pager") {
+  const normalized = normalizeAgentSlug(slug);
+  if (normalized === "product-one-pager") {
     return buildProductOnePagerPrompt("{{content}}");
   }
-  if (slug === "positioning-helper") {
+  if (normalized === "positioning-helper") {
     return buildPositioningPrompt("{{description}}");
   }
-  if (slug === "four-things") {
+  if (normalized === "four-things") {
     return buildFourThingsPrompt("{{content}}");
   }
-  if (slug === "nine-grid") {
+  if (normalized === "nine-grid") {
     return buildNineGridPrompt("{{content}}");
   }
-  if (slug === "course-outline") {
+  if (normalized === "course-outline") {
     return `根据输入的四件事信息{{shijianshi}}和九宫格信息{{jiugongge}}，请完成以下任务：
 
 1、先梳理四件事和九宫格之间的详细对应关系。
@@ -1351,7 +1352,7 @@ function getDefaultPromptTemplate(slug: string) {
 
 请用结构化方式输出 15 节课的大纲（标明阶段、节次、课程标题、课程目标、核心内容要点），整体控制在 10000 字以内。`;
   }
-  if (slug === "course-transcript") {
+  if (normalized === "course-transcript") {
     return `根据输入的定位信息{{dingwei}}，产品信息{{chanpin}}、四件事儿{{shijianshi}}、九宫格{{jiugongge}}、四件事和九宫格的关系{{guanxi}}，按照每一节产品课程大纲（带12步结构）{{kegang}}的内容框架，扩写成一个60分钟的课程话术稿。
 其中{{lastkegang}}是上一节课的内容，注意扩写本节内容的时候流畅衔接。
 扩写的内容中如果遇到案例、数据，要保证真实有效，有出处，不能编造。
@@ -1359,6 +1360,32 @@ function getDefaultPromptTemplate(slug: string) {
 结果控制在8000个字左右。`;
   }
   return "";
+}
+
+function normalizeAgentSlug(slug: string) {
+  const normalized = String(slug ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    normalized === "positioning" ||
+    normalized === "positioning-assistant" ||
+    normalized === "position-helper"
+  ) {
+    return "positioning-helper";
+  }
+  if (normalized === "fourthings" || normalized === "four_things") {
+    return "four-things";
+  }
+  if (normalized === "ninegrid" || normalized === "nine_grid") {
+    return "nine-grid";
+  }
+  if (normalized === "courseoutline" || normalized === "course_outline") {
+    return "course-outline";
+  }
+  if (normalized === "coursetranscript" || normalized === "course_transcript") {
+    return "course-transcript";
+  }
+  return normalized;
 }
 
 function parseStructuredContent(content: string, customKeys?: { key: string; label: string }[]) {
@@ -1488,6 +1515,7 @@ function buildPromptByTemplate(slug: string, template: string, content: string) 
 }
 
 export async function buildPromptForAgent(slug: string, content: string) {
+  const normalizedSlug = normalizeAgentSlug(slug);
   const rows = await query<{ prompt: string | null; system_prompt: string | null }>(
     `SELECT p.prompt, a.system_prompt
      FROM agents a
@@ -1496,12 +1524,24 @@ export async function buildPromptForAgent(slug: string, content: string) {
      LIMIT 1`,
     [slug]
   );
+  let fallbackRows: { prompt: string | null; system_prompt: string | null }[] = [];
+  if ((!rows[0]?.prompt && !rows[0]?.system_prompt) && normalizedSlug !== slug) {
+    fallbackRows = await query<{ prompt: string | null; system_prompt: string | null }>(
+      `SELECT p.prompt, a.system_prompt
+       FROM agents a
+       LEFT JOIN agent_prompts p ON p.agent_slug = a.slug
+       WHERE a.slug = ?
+       LIMIT 1`,
+      [normalizedSlug]
+    );
+  }
+  const row = rows[0] ?? fallbackRows[0];
   const template =
-    (rows[0]?.prompt ?? "").trim() ||
-    (rows[0]?.system_prompt ?? "").trim() ||
-    getDefaultPromptTemplate(slug);
+    (row?.prompt ?? "").trim() ||
+    (row?.system_prompt ?? "").trim() ||
+    getDefaultPromptTemplate(normalizedSlug);
   if (!template) {
     return content;
   }
-  return buildPromptByTemplate(slug, template, content);
+  return buildPromptByTemplate(normalizedSlug, template, content);
 }

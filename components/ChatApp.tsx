@@ -321,6 +321,7 @@ function buildFeishuClipboardHtml(sourceElement: HTMLElement) {
 }
 
 const PENDING_PREFIX = "正在生成，请稍候...";
+const EMPTY_AI_REPLY_FALLBACK = "【系统提示】本次生成未返回内容，请重试。";
 const VIRTUAL_CONVERSATION_ID = -1;
 const REVISION_ENABLED_SLUGS = new Set([
   "positioning-helper",
@@ -1135,7 +1136,7 @@ export default function ChatApp(props: Props) {
             if (!target) {
               continue;
             }
-            if (typeof target.content === "string" && target.content.trim()) {
+            if (typeof target.content === "string") {
               if (!isPendingAssistantContent(target.content)) {
                 setGeneratingConversationId((prev) =>
                   prev === conversationId ? null : prev
@@ -1166,7 +1167,7 @@ export default function ChatApp(props: Props) {
           setMessages(data);
           const target = data.find((m) => m.id === assistantMessageId);
           if (target && typeof target.content === "string") {
-            if (target.content.trim() && !isPendingAssistantContent(target.content)) {
+            if (!isPendingAssistantContent(target.content)) {
               setGeneratingConversationId((prev) =>
                 prev === conversationId ? null : prev
               );
@@ -1368,9 +1369,10 @@ export default function ChatApp(props: Props) {
             return;
           }
           if (payload.type === "final") {
-            const text =
+            const textRaw =
               typeof payload.content === "string" ? payload.content : "";
-            if (!assistantId || !text) return;
+            const text = textRaw.trim() ? textRaw : EMPTY_AI_REPLY_FALLBACK;
+            if (!assistantId) return;
             setMessages((prev) =>
               prev.map((m) => (m.id === assistantId ? { ...m, content: text } : m))
             );
