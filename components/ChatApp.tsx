@@ -324,10 +324,91 @@ const PENDING_PREFIX = "正在生成，请稍候...";
 const VIRTUAL_CONVERSATION_ID = -1;
 const REVISION_ENABLED_SLUGS = new Set([
   "positioning-helper",
+  "positioning",
+  "positioning-assistant",
+  "position-helper",
   "four-things",
   "nine-grid",
   "course-outline"
 ]);
+
+function isRevisionEnabledAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = String(agent.slug ?? "")
+    .trim()
+    .toLowerCase();
+  if (REVISION_ENABLED_SLUGS.has(slug)) return true;
+  const name = String(agent.name ?? "").trim();
+  if (!name) return false;
+  return (
+    name.includes("定位") ||
+    name.includes("四件事") ||
+    name.includes("九宫格") ||
+    name.includes("课纲")
+  );
+}
+
+function normalizeAgentSlug(slug: string | null | undefined) {
+  return String(slug ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function isPositioningAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "positioning-helper" ||
+    slug === "positioning" ||
+    slug === "positioning-assistant" ||
+    slug === "position-helper"
+  ) {
+    return true;
+  }
+  return String(agent.name ?? "").includes("定位");
+}
+
+function isFourThingsAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (slug === "four-things" || slug === "fourthings" || slug === "four_things") {
+    return true;
+  }
+  return String(agent.name ?? "").includes("四件事");
+}
+
+function isNineGridAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (slug === "nine-grid" || slug === "ninegrid" || slug === "nine_grid") {
+    return true;
+  }
+  return String(agent.name ?? "").includes("九宫格");
+}
+
+function isCourseOutlineAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (slug === "course-outline" || slug === "courseoutline" || slug === "course_outline") {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("课纲助手") || name === "课纲";
+}
+
+function isCourseTranscriptAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "course-transcript" ||
+    slug === "coursetranscript" ||
+    slug === "course_transcript"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("课程逐字稿") || name.includes("逐字稿");
+}
 
 function stripPendingPrefix(text: string) {
   const normalized = String(text ?? "").replace(/\r\n/g, "\n");
@@ -823,10 +904,10 @@ export default function ChatApp(props: Props) {
       try {
         if (!currentAgent) return;
         if (
-          currentAgent.slug === "course-outline" ||
-          currentAgent.slug === "course-transcript" ||
-          currentAgent.slug === "four-things" ||
-          currentAgent.slug === "nine-grid"
+          isCourseOutlineAgent(currentAgent) ||
+          isCourseTranscriptAgent(currentAgent) ||
+          isFourThingsAgent(currentAgent) ||
+          isNineGridAgent(currentAgent)
         ) {
           const queries: {
             key:
@@ -837,13 +918,13 @@ export default function ChatApp(props: Props) {
               | "positioningContent";
             agentName: string;
           }[] =
-            currentAgent.slug === "course-outline"
+            isCourseOutlineAgent(currentAgent)
               ? [
                   { key: "content", agentName: "产品一页纸" },
                   { key: "fourThingsContent", agentName: "四件事" },
                   { key: "nineGridContent", agentName: "九宫格" }
                 ]
-              : currentAgent.slug === "course-transcript"
+              : isCourseTranscriptAgent(currentAgent)
               ? [
                   { key: "content", agentName: "产品一页纸" },
                   { key: "fourThingsContent", agentName: "四件事" },
@@ -1113,7 +1194,7 @@ export default function ChatApp(props: Props) {
     const content = currentInput;
     const trimmedContent = content.trim();
     let promptOverride: string | undefined;
-    if (currentAgent && REVISION_ENABLED_SLUGS.has(currentAgent.slug)) {
+    if (isRevisionEnabledAgent(currentAgent)) {
       const lastAssistant = [...messages]
         .reverse()
         .find((message) => {
@@ -1136,7 +1217,7 @@ export default function ChatApp(props: Props) {
           referencedContextByConversation[lookupConversationId] ?? "";
         if (lastResult) {
           promptOverride = buildRevisionPrompt({
-            agentName: currentAgent.name,
+            agentName: currentAgent?.name ?? "当前智能体",
             userInput: trimmedContent,
             lastResult,
             lastPrompt,
@@ -1170,7 +1251,7 @@ export default function ChatApp(props: Props) {
         const conv: Conversation = await convRes.json();
         if (
           currentAgent &&
-          REVISION_ENABLED_SLUGS.has(currentAgent.slug) &&
+          isRevisionEnabledAgent(currentAgent) &&
           referencedContextByConversation[VIRTUAL_CONVERSATION_ID]
         ) {
           const value = referencedContextByConversation[VIRTUAL_CONVERSATION_ID];
@@ -1744,11 +1825,11 @@ export default function ChatApp(props: Props) {
   const handleOpenReferenceData = useCallback(async () => {
     if (
       !currentAgent ||
-      (currentAgent.slug !== "positioning-helper" &&
-        currentAgent.slug !== "four-things" &&
-        currentAgent.slug !== "nine-grid" &&
-        currentAgent.slug !== "course-outline" &&
-        currentAgent.slug !== "course-transcript")
+      (!isPositioningAgent(currentAgent) &&
+        !isFourThingsAgent(currentAgent) &&
+        !isNineGridAgent(currentAgent) &&
+        !isCourseOutlineAgent(currentAgent) &&
+        !isCourseTranscriptAgent(currentAgent))
     ) {
       return;
     }
@@ -1771,7 +1852,7 @@ export default function ChatApp(props: Props) {
       }
       const data: string[] = await res.json();
       setProductNameOptions(data);
-      if (currentAgent.slug === "course-outline") {
+      if (isCourseOutlineAgent(currentAgent)) {
         const rulesRes = await fetch("/api/course-rules");
         if (rulesRes.ok) {
           const rulesData: CourseRuleRow[] = await rulesRes.json();
@@ -2371,11 +2452,11 @@ export default function ChatApp(props: Props) {
                 {!sending && generatingConversationId === currentConversationId ? (
                   <span>已提交，生成中...</span>
                 ) : null}
-                {(currentAgent?.slug === "positioning-helper" ||
-                  currentAgent?.slug === "four-things" ||
-                  currentAgent?.slug === "nine-grid" ||
-                  currentAgent?.slug === "course-outline" ||
-                  currentAgent?.slug === "course-transcript") ? (
+                {(isPositioningAgent(currentAgent) ||
+                  isFourThingsAgent(currentAgent) ||
+                  isNineGridAgent(currentAgent) ||
+                  isCourseOutlineAgent(currentAgent) ||
+                  isCourseTranscriptAgent(currentAgent)) ? (
                   <button
                     type="button"
                     className="underline normal-case text-[11px] opacity-100"
@@ -2492,7 +2573,7 @@ export default function ChatApp(props: Props) {
                       disabled
                     />
                   </div>
-                  {currentAgent && currentAgent.slug === "course-outline" ? (
+                  {isCourseOutlineAgent(currentAgent) ? (
                     <>
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
@@ -2617,7 +2698,7 @@ export default function ChatApp(props: Props) {
                         />
                       </div>
                     </>
-                  ) : currentAgent && currentAgent.slug === "course-transcript" ? (
+                  ) : isCourseTranscriptAgent(currentAgent) ? (
                     <>
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
@@ -2765,8 +2846,8 @@ export default function ChatApp(props: Props) {
                         />
                       </div>
                       {currentAgent &&
-                        (currentAgent.slug === "four-things" ||
-                          currentAgent.slug === "nine-grid") && (
+                        (isFourThingsAgent(currentAgent) ||
+                          isNineGridAgent(currentAgent)) && (
                         <div>
                           <label className="mb-1 block text-[11px] text-slate-600">
                             定位结果内容
@@ -2809,8 +2890,8 @@ export default function ChatApp(props: Props) {
                         let text = referenceForm.content;
                         if (currentAgent) {
                           if (
-                            currentAgent.slug === "four-things" ||
-                            currentAgent.slug === "nine-grid"
+                            isFourThingsAgent(currentAgent) ||
+                            isNineGridAgent(currentAgent)
                           ) {
                             const posContent = (
                               referenceForm.positioningContent ?? ""
@@ -2822,10 +2903,10 @@ export default function ChatApp(props: Props) {
                             }
                           }
                           if (
-                            currentAgent.slug === "course-outline" ||
-                            currentAgent.slug === "course-transcript"
+                            isCourseOutlineAgent(currentAgent) ||
+                            isCourseTranscriptAgent(currentAgent)
                           ) {
-                            if (currentAgent.slug === "course-outline") {
+                            if (isCourseOutlineAgent(currentAgent)) {
                               const sections: string[] = [];
                               const productContent = referenceForm.content.trim();
                               const fourThings = (referenceForm.fourThingsContent ?? "").trim();
@@ -2873,7 +2954,7 @@ export default function ChatApp(props: Props) {
                                 text = sections.join("\n\n");
                             }
                           }
-                          if (currentAgent.slug === "course-transcript") {
+                          if (isCourseTranscriptAgent(currentAgent)) {
                             const extraSections: string[] = [];
                             const mapping = courseTranscriptFourThingsNineGridMapping.trim();
                             const currentOutline = courseTranscriptCurrentLessonOutline.trim();
@@ -2910,7 +2991,7 @@ export default function ChatApp(props: Props) {
                         }
                         if (
                           currentAgent &&
-                          REVISION_ENABLED_SLUGS.has(currentAgent.slug)
+                          isRevisionEnabledAgent(currentAgent)
                         ) {
                           const referencedContext = text.trim();
                           if (referencedContext) {

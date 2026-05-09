@@ -13,6 +13,60 @@ type Params = {
 
 const PENDING_PREFIX = "正在生成，请稍候...";
 
+const AI_AGENT_SLUGS = new Set([
+  "positioning-helper",
+  "positioning",
+  "positioning-assistant",
+  "position-helper",
+  "product-one-pager",
+  "four-things",
+  "nine-grid",
+  "course-outline",
+  "course-transcript"
+]);
+
+const REVISION_ENABLED_SLUGS = new Set([
+  "positioning-helper",
+  "positioning",
+  "positioning-assistant",
+  "position-helper",
+  "four-things",
+  "nine-grid",
+  "course-outline"
+]);
+
+function isAiAgent(slug: string, agentName: string) {
+  const normalizedSlug = String(slug ?? "")
+    .trim()
+    .toLowerCase();
+  if (AI_AGENT_SLUGS.has(normalizedSlug)) return true;
+  const name = String(agentName ?? "").trim();
+  if (!name) return false;
+  return (
+    name.includes("产品一页纸") ||
+    name.includes("定位") ||
+    name.includes("四件事") ||
+    name.includes("九宫格") ||
+    name.includes("课纲") ||
+    name.includes("课程")
+  );
+}
+
+function isRevisionEnabledAgent(slug: string, agentName: string) {
+  const normalizedSlug = String(slug ?? "")
+    .trim()
+    .toLowerCase();
+  if (REVISION_ENABLED_SLUGS.has(normalizedSlug)) return true;
+  const name = String(agentName ?? "").trim();
+  if (!name) return false;
+  return (
+    name.includes("定位") ||
+    name.includes("四件事") ||
+    name.includes("九宫格") ||
+    name.includes("课纲")
+  );
+}
+
 export async function GET(_request: Request, context: Params) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -46,6 +100,7 @@ export async function POST(request: Request, context: Params) {
     const conversationId = Number(context.params.id);
     const body = await request.json();
     const content = String(body.content ?? "").trim();
+    const rawPromptOverride = String(body.promptOverride ?? "").trim();
     const wantsStream =
       body?.stream === true ||
       (request.headers.get("accept") ?? "").includes("text/event-stream");
@@ -158,17 +213,13 @@ ${content}`;
     let aiReply: any = null;
     let aiPrompt: string | null = null;
 
-    const aiAgents = new Set([
-      "positioning-helper",
-      "product-one-pager",
-      "four-things",
-      "nine-grid",
-      "course-outline",
-      "course-transcript"
-    ]);
-
-    if (aiAgents.has(conversation.slug)) {
-      let prompt = await buildPromptForAgent(conversation.slug, content);
+    if (isAiAgent(conversation.slug, conversation.agent_name)) {
+      const promptOverride =
+        isRevisionEnabledAgent(conversation.slug, conversation.agent_name) &&
+        rawPromptOverride
+          ? rawPromptOverride
+          : "";
+      let prompt = promptOverride || (await buildPromptForAgent(conversation.slug, content));
       let aiMessages:
         | Array<{ role: "system" | "user" | "assistant"; content: string }>
         | undefined;
