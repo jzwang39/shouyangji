@@ -422,6 +422,77 @@ function isPendingAssistantContent(text: string) {
   return stripPendingPrefix(text) === PENDING_PREFIX;
 }
 
+function parseChineseLessonNumber(value: string) {
+  const text = String(value ?? "").trim();
+  if (!text) return NaN;
+  if (/^\d+$/.test(text)) return Number(text);
+
+  const normalized = text.replace(/两/g, "二");
+  const digitMap: Record<string, number> = {
+    "零": 0,
+    "〇": 0,
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9
+  };
+
+  if (normalized === "十") return 10;
+  if (normalized.startsWith("十")) {
+    const tail = normalized.slice(1);
+    const tailValue = digitMap[tail];
+    return Number.isFinite(tailValue) ? 10 + tailValue : NaN;
+  }
+  if (normalized.endsWith("十")) {
+    const head = normalized.slice(0, -1);
+    const headValue = digitMap[head];
+    return Number.isFinite(headValue) ? headValue * 10 : NaN;
+  }
+  const tenIndex = normalized.indexOf("十");
+  if (tenIndex > 0) {
+    const head = normalized.slice(0, tenIndex);
+    const tail = normalized.slice(tenIndex + 1);
+    const headValue = digitMap[head];
+    const tailValue = digitMap[tail];
+    if (Number.isFinite(headValue) && Number.isFinite(tailValue)) {
+      return headValue * 10 + tailValue;
+    }
+  }
+  const directValue = digitMap[normalized];
+  return Number.isFinite(directValue) ? directValue : NaN;
+}
+
+function getCourseOutlineLessonMatches(text: string) {
+  const source = String(text ?? "");
+  const regex =
+    /^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:\d+\s*[.、]\s*)?第\s*([0-9一二三四五六七八九十两〇零]+)\s*(?:节|课)(?:课)?(?:\*\*)?\s*[：:：\-—]?.*$/gm;
+  return Array.from(source.matchAll(regex)).filter((match) => {
+    const value = parseChineseLessonNumber(match[1]);
+    return Number.isFinite(value) && value > 0;
+  });
+}
+
+function getCourseOutlineLessonSection(text: string, lessonIndex: number) {
+  if (!Number.isFinite(lessonIndex) || lessonIndex <= 0) return "";
+  const source = String(text ?? "");
+  const matches = getCourseOutlineLessonMatches(source);
+  for (let i = 0; i < matches.length; i += 1) {
+    const match = matches[i];
+    const value = parseChineseLessonNumber(match[1]);
+    if (value !== lessonIndex) continue;
+    const start = match.index ?? 0;
+    const end =
+      i + 1 < matches.length ? (matches[i + 1].index ?? source.length) : source.length;
+    return source.slice(start, end).trim();
+  }
+  return "";
+}
+
 function extractProductOnePagerSaveContent(text: string) {
   const source = String(text ?? "");
   const marker = "产品基本信息一页纸";
@@ -616,15 +687,14 @@ export default function ChatApp(props: Props) {
   );
 
   const courseTranscriptLessonOptions = useMemo(() => {
-    if (!currentAgent || currentAgent.slug !== "course-transcript") {
+    if (!isCourseTranscriptAgent(currentAgent)) {
       return [];
     }
     if (!referenceForm || !referenceForm.courseOutlineContent) {
       return [];
     }
     const text = referenceForm.courseOutlineContent;
-    const headerRegex = /^#{2,4}\s*(?:\*\*)?第(\d+)节.*$/gm;
-    const lessonNumbers = Array.from(text.matchAll(headerRegex))
+    const lessonNumbers = getCourseOutlineLessonMatches(text)
       .map((match) => Number(match[1]))
       .filter((value) => Number.isFinite(value) && value > 0);
     let count = lessonNumbers.length > 0 ? Math.max(...lessonNumbers) : 0;
@@ -642,7 +712,7 @@ export default function ChatApp(props: Props) {
   }, [currentAgent, referenceForm?.courseOutlineContent]);
 
   const courseTranscriptCurrentLessonOutline = useMemo(() => {
-    if (!currentAgent || currentAgent.slug !== "course-transcript") {
+    if (!isCourseTranscriptAgent(currentAgent)) {
       return "";
     }
     if (!referenceForm || !referenceForm.courseOutlineContent) {
@@ -655,22 +725,14 @@ export default function ChatApp(props: Props) {
     if (!Number.isFinite(lessonIndex) || lessonIndex <= 0) {
       return "";
     }
-    const text = referenceForm.courseOutlineContent;
-    const regex = /^#{2,4}\s*(?:\*\*)?第(\d+)节.*$/gm;
-    const matches = Array.from(text.matchAll(regex));
-    for (let i = 0; i < matches.length; i += 1) {
-      const match = matches[i];
-      const value = Number(match[1]);
-      if (value !== lessonIndex) continue;
-      const start = match.index ?? 0;
-      const end = i + 1 < matches.length ? (matches[i + 1].index ?? text.length) : text.length;
-      return text.slice(start, end).trim();
-    }
-    return "";
+    return getCourseOutlineLessonSection(
+      referenceForm.courseOutlineContent,
+      lessonIndex
+    );
   }, [currentAgent, referenceForm?.courseOutlineContent, referenceForm?.currentLesson]);
 
   const courseTranscriptPreviousLessonOutline = useMemo(() => {
-    if (!currentAgent || currentAgent.slug !== "course-transcript") {
+    if (!isCourseTranscriptAgent(currentAgent)) {
       return "";
     }
     if (!referenceForm || !referenceForm.courseOutlineContent) {
@@ -684,22 +746,14 @@ export default function ChatApp(props: Props) {
     if (!Number.isFinite(lessonIndex) || lessonIndex <= 0) {
       return "";
     }
-    const text = referenceForm.courseOutlineContent;
-    const regex = /^#{2,4}\s*(?:\*\*)?第(\d+)节.*$/gm;
-    const matches = Array.from(text.matchAll(regex));
-    for (let i = 0; i < matches.length; i += 1) {
-      const match = matches[i];
-      const value = Number(match[1]);
-      if (value !== lessonIndex) continue;
-      const start = match.index ?? 0;
-      const end = i + 1 < matches.length ? (matches[i + 1].index ?? text.length) : text.length;
-      return text.slice(start, end).trim();
-    }
-    return "";
+    return getCourseOutlineLessonSection(
+      referenceForm.courseOutlineContent,
+      lessonIndex
+    );
   }, [currentAgent, referenceForm?.courseOutlineContent, referenceForm?.currentLesson]);
 
   const courseTranscriptFourThingsNineGridMapping = useMemo(() => {
-    if (!currentAgent || currentAgent.slug !== "course-transcript") {
+    if (!isCourseTranscriptAgent(currentAgent)) {
       return "";
     }
     if (!referenceForm || !referenceForm.courseOutlineContent) {
