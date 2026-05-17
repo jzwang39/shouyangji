@@ -1514,21 +1514,34 @@ function buildPromptByTemplate(slug: string, template: string, content: string) 
   }
 
   if (slug === "course-transcript") {
-    if (hasHeaders) {
-      const lastkegang = parsedVars.lastkegang || "（当前为第一节课程，无上一节课大纲）";
-      return renderTemplate(template, {
-        ...parsedVars,
-        lastkegang,
-        content,
-        description: content
-      });
+    // 提取具体的节次名和完整标题
+    let currentLessonLabel = "当前节次";
+    let currentLessonTitle = "";
+    const kegang = parsedVars.kegang || content;
+    const kegangLines = kegang.split("\n");
+    for (const line of kegangLines) {
+      const match = line.match(/第\s*([0-9一二三四五六七八九十两〇零]+)\s*(?:节|课)/);
+      if (match) {
+        currentLessonLabel = `第${match[1]}节`;
+        currentLessonTitle = line.trim();
+        break;
+      }
     }
-
-    return renderTemplate(template, {
+    
+    const lastkegang = parsedVars.lastkegang || "（当前为第一节课程，无上一节课大纲）";
+    const basePrompt = renderTemplate(template, {
+      ...parsedVars,
+      lastkegang,
       content,
-      description: content,
-      chanpin: content
+      description: content
     });
+    
+    // 在基础 Prompt 后添加强指令
+    return `${basePrompt}
+
+【极其重要的强制指令】：
+通过大纲识别，当前你正在撰写的是【${currentLessonTitle || currentLessonLabel}】的逐字稿！
+你的输出标题必须以此开头，绝对不允许从第1节开始写！禁止出现“第一节”、“第1节”等无关字眼（除非当前真的是第1节），严格围绕【${currentLessonLabel}】展开！必须打破从头开始写的惯性！`;
   }
 
   return renderTemplate(template, {
