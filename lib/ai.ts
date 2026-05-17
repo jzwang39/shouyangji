@@ -860,12 +860,21 @@ export function buildCourseTranscriptPrompt(content: string) {
   const guanxi = buckets.guanxi.join("\n").trim();
   const kegang = buckets.kegang.join("\n").trim();
   const lastkegang = buckets.lastkegang.join("\n").trim();
-  const currentLessonMatch = kegang.match(/第\s*([0-9一二三四五六七八九十两〇零]+)\s*(?:节|课)/);
-  const currentLessonLabel = currentLessonMatch
-    ? `第${currentLessonMatch[1]}节`
-    : "当前节次";
+  
+  // 提取具体的节次名和完整标题
+  let currentLessonLabel = "当前节次";
+  let currentLessonTitle = "";
+  const kegangLines = kegang.split("\n");
+  for (const line of kegangLines) {
+    const match = line.match(/第\s*([0-9一二三四五六七八九十两〇零]+)\s*(?:节|课)/);
+    if (match) {
+      currentLessonLabel = `第${match[1]}节`;
+      currentLessonTitle = line.trim();
+      break;
+    }
+  }
 
-  return `你现在要扩写的是“课程逐字稿”的${currentLessonLabel}，不是第1节，也不是其他节次。
+  return `你现在要扩写的是“课程逐字稿”。
 
 根据输入的定位信息${dingwei}，产品信息${chanpin}、四件事儿${shijianshi}、九宫格${jiugongge}、四件事和九宫格的关系${guanxi}，按照本节产品课程大纲（带12步结构）${kegang}的内容框架，扩写成一个60分钟的课程话术稿。
 
@@ -873,13 +882,14 @@ export function buildCourseTranscriptPrompt(content: string) {
 ${lastkegang || "（当前为第一节课程，无上一节课大纲）"}
 
 严格要求：
-1. 必须只生成${currentLessonLabel}的逐字稿，不能生成第1节，也不能生成其他节次。
-2. 开场标题、主标题、课程目标、内容结构必须以“本节课大纲”中的${currentLessonLabel}为准。
-3. 如果“上一节课大纲”与“本节课大纲”冲突，一律以“本节课大纲”为准。
-4. 不要擅自改成“第1节”或其他节次；如果你发现历史信息里出现别的节次，也必须忽略。
-5. 扩写的内容中如果遇到案例、数据，要保证真实有效，有出处，不能编造。
-  
-结果控制在8000个字左右。`;
+1. 开场标题、主标题、课程目标、内容结构必须以“本节课大纲”为准。
+2. 如果“上一节课大纲”与“本节课大纲”冲突，一律以“本节课大纲”为准。
+3. 扩写的内容中如果遇到案例、数据，要保证真实有效，有出处，不能编造。
+4. 结果控制在8000个字左右。
+
+【极其重要的强制指令】：
+通过大纲识别，当前你正在撰写的是【${currentLessonTitle || currentLessonLabel}】的逐字稿！
+你的输出标题必须以此开头，绝对不允许从第1节开始写！禁止出现“第一节”、“第1节”等无关字眼（除非当前真的是第1节），严格围绕【${currentLessonLabel}】展开！必须打破从头开始写的惯性！`;
 }
 
 type CallAiWithPromptOptions = {
