@@ -23,7 +23,8 @@ const AI_AGENT_SLUGS = new Set([
   "four-things",
   "nine-grid",
   "course-outline",
-  "course-transcript"
+  "course-transcript",
+  "experiment-design-assistant"
 ]);
 
 const REVISION_ENABLED_SLUGS = new Set([
@@ -33,7 +34,8 @@ const REVISION_ENABLED_SLUGS = new Set([
   "position-helper",
   "four-things",
   "nine-grid",
-  "course-outline"
+  "course-outline",
+  "experiment-design-assistant"
 ]);
 
 function isAiAgent(slug: string, agentName: string) {
@@ -49,7 +51,9 @@ function isAiAgent(slug: string, agentName: string) {
     name.includes("四件事") ||
     name.includes("九宫格") ||
     name.includes("课纲") ||
-    name.includes("课程")
+    name.includes("课程") ||
+    name.includes("实验设计") ||
+    name.includes("实验")
   );
 }
 
@@ -64,7 +68,9 @@ function isRevisionEnabledAgent(slug: string, agentName: string) {
     name.includes("定位") ||
     name.includes("四件事") ||
     name.includes("九宫格") ||
-    name.includes("课纲")
+    name.includes("课纲") ||
+    name.includes("实验设计") ||
+    name.includes("实验")
   );
 }
 

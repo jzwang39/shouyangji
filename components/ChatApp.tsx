@@ -330,7 +330,8 @@ const REVISION_ENABLED_SLUGS = new Set([
   "position-helper",
   "four-things",
   "nine-grid",
-  "course-outline"
+  "course-outline",
+  "experiment-design-assistant"
 ]);
 
 function isRevisionEnabledAgent(agent: Agent | null | undefined) {
@@ -345,7 +346,9 @@ function isRevisionEnabledAgent(agent: Agent | null | undefined) {
     name.includes("定位") ||
     name.includes("四件事") ||
     name.includes("九宫格") ||
-    name.includes("课纲")
+    name.includes("课纲") ||
+    name.includes("实验设计") ||
+    name.includes("实验")
   );
 }
 

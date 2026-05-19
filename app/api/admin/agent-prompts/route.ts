@@ -19,7 +19,8 @@ const allowedSlugs = [
   "four-things",
   "nine-grid",
   "course-outline",
-  "course-transcript"
+  "course-transcript",
+  "experiment-design-assistant"
 ] as const;
 
 export async function GET() {
