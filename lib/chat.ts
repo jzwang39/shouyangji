@@ -36,6 +36,7 @@ export async function listAgents(): Promise<Agent[]> {
     "course-outline",
     "course-transcript",
     "material-tagging-assistant",
+    "deterministic-material-capture-assistant",
     "experiment-design-assistant"
   ];
   

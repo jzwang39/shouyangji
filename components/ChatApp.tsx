@@ -331,7 +331,8 @@ const REVISION_ENABLED_SLUGS = new Set([
   "four-things",
   "nine-grid",
   "course-outline",
-  "experiment-design-assistant"
+  "experiment-design-assistant",
+  "deterministic-material-capture-assistant"
 ]);
 
 function isRevisionEnabledAgent(agent: Agent | null | undefined) {
@@ -348,7 +349,8 @@ function isRevisionEnabledAgent(agent: Agent | null | undefined) {
     name.includes("九宫格") ||
     name.includes("课纲") ||
     name.includes("实验设计") ||
-    name.includes("实验")
+    name.includes("实验") ||
+    name.includes("确定性素材抓取")
   );
 }
 
@@ -428,6 +430,20 @@ function isMaterialTaggingAgent(agent: Agent | null | undefined) {
   return name.includes("素材标记");
 }
 
+function isDeterministicMaterialCaptureAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "deterministic-material-capture-assistant" ||
+    slug === "deterministic-material-capture" ||
+    slug === "deterministic_material_capture"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("确定性素材抓取");
+}
+
 function stripPendingPrefix(text: string) {
   const normalized = String(text ?? "").replace(/\r\n/g, "\n");
   if (!normalized.startsWith(PENDING_PREFIX)) return String(text ?? "");
@@ -463,7 +479,7 @@ function normalizeMessagesForDisplay(
   messages: Message[],
   agent: Agent | null | undefined
 ) {
-  if (!isMaterialTaggingAgent(agent)) {
+  if (!isMaterialTaggingAgent(agent) && !isDeterministicMaterialCaptureAgent(agent)) {
     return messages;
   }
 
@@ -3209,6 +3225,7 @@ export default function ChatApp(props: Props) {
                       <option value="课纲">课纲</option>
                       <option value="课程">课程</option>
                       <option value="素材标记">素材标记</option>
+                      <option value="确定性素材抓取">确定性素材抓取</option>
                     </select>
                   </div>
                   <div>

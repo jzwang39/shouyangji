@@ -1402,6 +1402,17 @@ function getDefaultPromptTemplate(slug: string) {
 
 请确保标记准确、分类合理，能够帮助用户更好地管理和检索素材。`;
   }
+  if (normalized === "deterministic-material-capture-assistant") {
+    console.log(`[getDefaultPromptTemplate] 返回 deterministic-material-capture-assistant 默认模板`);
+    return `你是一位专业的素材抓取专家，擅长从各种来源中确定性抓取和提取素材内容。请根据用户提供的来源和提取要求，进行以下工作：
+1. 分析来源内容的结构和特点
+2. 确定性地识别和提取目标素材
+3. 确保提取结果的准确性和完整性
+4. 对提取的素材进行初步整理和分类
+5. 提供提取过程的说明和注意事项
+
+请确保抓取过程具有确定性，提取结果准确无误，能够满足用户的素材需求。`;
+  }
   if (normalized === "experiment-design-assistant") {
     console.log(`[getDefaultPromptTemplate] 返回 experiment-design-assistant 默认模板`);
     return `你是一位资深的实验设计专家，擅长设计科学严谨的实验方案。请根据用户提供的实验目标和条件，设计完整的实验方案，包括：实验假设、自变量和因变量、控制变量、实验组和对照组设计、样本量计算、数据收集方法、统计分析方法等。确保实验设计符合科学原则，能够有效验证假设。`;
@@ -1439,6 +1450,9 @@ function normalizeAgentSlug(slug: string) {
   }
   if (normalized === "experiment-design" || normalized === "experiment_design") {
     return "experiment-design-assistant";
+  }
+  if (normalized === "deterministic-material-capture" || normalized === "deterministic_material_capture") {
+    return "deterministic-material-capture-assistant";
   }
   return normalized;
 }

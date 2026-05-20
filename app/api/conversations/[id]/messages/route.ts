@@ -25,6 +25,7 @@ const AI_AGENT_SLUGS = new Set([
   "course-outline",
   "course-transcript",
   "material-tagging-assistant",
+  "deterministic-material-capture-assistant",
   "experiment-design-assistant"
 ]);
 
@@ -36,7 +37,8 @@ const REVISION_ENABLED_SLUGS = new Set([
   "four-things",
   "nine-grid",
   "course-outline",
-  "experiment-design-assistant"
+  "experiment-design-assistant",
+  "deterministic-material-capture-assistant"
 ]);
 
 function isAiAgent(slug: string, agentName: string) {
@@ -56,7 +58,8 @@ function isAiAgent(slug: string, agentName: string) {
     name.includes("实验设计") ||
     name.includes("实验") ||
     name.includes("素材标记") ||
-    name.includes("素材")
+    name.includes("素材") ||
+    name.includes("确定性素材抓取")
   );
 }
 
@@ -73,7 +76,8 @@ function isRevisionEnabledAgent(slug: string, agentName: string) {
     name.includes("九宫格") ||
     name.includes("课纲") ||
     name.includes("实验设计") ||
-    name.includes("实验")
+    name.includes("实验") ||
+    name.includes("确定性素材抓取")
   );
 }
 
