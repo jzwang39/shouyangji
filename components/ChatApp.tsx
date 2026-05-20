@@ -439,6 +439,50 @@ function isPendingAssistantContent(text: string) {
   return stripPendingPrefix(text) === PENDING_PREFIX;
 }
 
+function mergeAssistantContent(previous: string, current: string) {
+  const previousText = stripPendingPrefix(previous);
+  const currentText = stripPendingPrefix(current);
+
+  if (previousText === PENDING_PREFIX) {
+    return currentText;
+  }
+  if (currentText === PENDING_PREFIX) {
+    return previousText;
+  }
+  if (!previousText.trim()) {
+    return currentText;
+  }
+  if (!currentText.trim()) {
+    return previousText;
+  }
+
+  return `${previousText.replace(/\s+$/, "")}\n\n${currentText.replace(/^\s+/, "")}`;
+}
+
+function normalizeMessagesForDisplay(
+  messages: Message[],
+  agent: Agent | null | undefined
+) {
+  if (!isMaterialTaggingAgent(agent)) {
+    return messages;
+  }
+
+  const merged: Message[] = [];
+  for (const message of messages) {
+    const last = merged[merged.length - 1];
+    if (message.role === "assistant" && last?.role === "assistant") {
+      merged[merged.length - 1] = {
+        ...message,
+        created_at: last.created_at,
+        content: mergeAssistantContent(last.content, message.content)
+      };
+      continue;
+    }
+    merged.push(message);
+  }
+  return merged;
+}
+
 function parseChineseLessonNumber(value: string) {
   const text = String(value ?? "").trim();
   if (!text) return NaN;
@@ -861,16 +905,17 @@ export default function ChatApp(props: Props) {
           throw new Error(message);
         }
         const data: Message[] = await res.json();
+        const normalizedData = normalizeMessagesForDisplay(data, currentAgent);
         setMessages((prev) => {
           const optimistic = prev.filter((m) => typeof m.id === "number" && m.id < 0);
-          if (optimistic.length === 0) return data;
+          if (optimistic.length === 0) return normalizedData;
           const remaining = optimistic.filter(
             (m) => !data.some((d) => d.role === m.role && d.content === m.content)
           );
-          if (remaining.length === 0) return data;
-          return [...data, ...remaining];
+          if (remaining.length === 0) return normalizedData;
+          return [...normalizedData, ...remaining];
         });
-        const lastAssistant = [...data]
+        const lastAssistant = [...normalizedData]
           .reverse()
           .find((message) => message.role === "assistant");
         const pending =
@@ -900,7 +945,7 @@ export default function ChatApp(props: Props) {
     return () => {
       controller.abort();
     };
-  }, [currentConversationId, getErrorMessage, messagesReloadKey]);
+  }, [currentConversationId, currentAgent, getErrorMessage, messagesReloadKey]);
 
   useEffect(() => {
     if (!loadingMessages) return;
@@ -1199,10 +1244,11 @@ export default function ChatApp(props: Props) {
               return;
             }
             const data: Message[] = await res.json();
+            const normalizedData = normalizeMessagesForDisplay(data, currentAgent);
             if (currentConversationIdRef.current !== conversationId) {
               return;
             }
-            setMessages(data);
+            setMessages(normalizedData);
             const target = data.find((m) => m.id === assistantMessageId);
             if (!target) {
               continue;
@@ -1232,10 +1278,11 @@ export default function ChatApp(props: Props) {
             return;
           }
           const data: Message[] = await res.json();
+          const normalizedData = normalizeMessagesForDisplay(data, currentAgent);
           if (currentConversationIdRef.current !== conversationId) {
             return;
           }
-          setMessages(data);
+          setMessages(normalizedData);
           const target = data.find((m) => m.id === assistantMessageId);
           if (target && typeof target.content === "string") {
             if (!isPendingAssistantContent(target.content)) {
@@ -1254,7 +1301,7 @@ export default function ChatApp(props: Props) {
         }
       }
     },
-    []
+    [currentAgent]
   );
 
   const handleSend = async () => {
