@@ -20,6 +20,7 @@ const allowedSlugs = [
   "nine-grid",
   "course-outline",
   "course-transcript",
+  "material-tagging-assistant",
   "experiment-design-assistant"
 ] as const;
 

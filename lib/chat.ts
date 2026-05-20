@@ -23,9 +23,39 @@ export type Message = {
 };
 
 export async function listAgents(): Promise<Agent[]> {
-  return query<Agent>(
+  const agents = await query<Agent>(
     "SELECT id, name, slug, description, system_prompt FROM agents WHERE is_active = 1 ORDER BY id ASC"
   );
+  
+  // 定义固定的显示顺序
+  const displayOrder = [
+    "product-one-pager",
+    "positioning-helper",
+    "four-things",
+    "nine-grid",
+    "course-outline",
+    "course-transcript",
+    "material-tagging-assistant",
+    "experiment-design-assistant"
+  ];
+  
+  // 按照displayOrder排序
+  return agents.sort((a, b) => {
+    const indexA = displayOrder.indexOf(a.slug);
+    const indexB = displayOrder.indexOf(b.slug);
+    
+    // 如果都在displayOrder中，按照displayOrder的顺序排序
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
+    }
+    
+    // 如果只有一个在displayOrder中，在displayOrder中的排在前面
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    
+    // 如果都不在displayOrder中，保持原来的顺序
+    return 0;
+  });
 }
 
 export async function listConversations(userId: number): Promise<Conversation[]> {

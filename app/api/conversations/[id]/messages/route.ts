@@ -24,6 +24,7 @@ const AI_AGENT_SLUGS = new Set([
   "nine-grid",
   "course-outline",
   "course-transcript",
+  "material-tagging-assistant",
   "experiment-design-assistant"
 ]);
 
@@ -53,7 +54,9 @@ function isAiAgent(slug: string, agentName: string) {
     name.includes("课纲") ||
     name.includes("课程") ||
     name.includes("实验设计") ||
-    name.includes("实验")
+    name.includes("实验") ||
+    name.includes("素材标记") ||
+    name.includes("素材")
   );
 }
 
@@ -108,6 +111,7 @@ export async function POST(request: Request, context: Params) {
     const body = await request.json();
     const content = String(body.content ?? "").trim();
     const rawPromptOverride = String(body.promptOverride ?? "").trim();
+    const followupResultContext = String(body.followupResultContext ?? "").trim();
     const wantsStream =
       body?.stream === true ||
       (request.headers.get("accept") ?? "").includes("text/event-stream");
@@ -221,12 +225,27 @@ ${content}`;
     let aiPrompt: string | null = null;
 
     if (isAiAgent(conversation.slug, conversation.agent_name)) {
+      console.log(`[API] 处理AI智能体消息，slug: ${conversation.slug}, agent_name: ${conversation.agent_name}`);
       const promptOverride =
         isRevisionEnabledAgent(conversation.slug, conversation.agent_name) &&
         rawPromptOverride
           ? rawPromptOverride
           : "";
-      let prompt = promptOverride || (await buildPromptForAgent(conversation.slug, content));
+      console.log(`[API] promptOverride: ${promptOverride ? '有值' : '空'}`);
+      const isMaterialTaggingConversation =
+        String(conversation.slug ?? "").trim().toLowerCase() ===
+          "material-tagging-assistant" ||
+        String(conversation.agent_name ?? "").includes("素材标记");
+      const promptContent =
+        isMaterialTaggingConversation && followupResultContext
+          ? `以下是最近一次生成的结果信息：
+${followupResultContext}
+
+以下是用户本次的新请求：
+${content}`
+          : content;
+      let prompt =
+        promptOverride || (await buildPromptForAgent(conversation.slug, promptContent));
       let aiMessages:
         | Array<{ role: "system" | "user" | "assistant"; content: string }>
         | undefined;

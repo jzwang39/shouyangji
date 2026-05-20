@@ -414,6 +414,20 @@ function isCourseTranscriptAgent(agent: Agent | null | undefined) {
   return name.includes("课程逐字稿") || name.includes("逐字稿");
 }
 
+function isMaterialTaggingAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "material-tagging-assistant" ||
+    slug === "material-tagging" ||
+    slug === "material_tagging"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("素材标记");
+}
+
 function stripPendingPrefix(text: string) {
   const normalized = String(text ?? "").replace(/\r\n/g, "\n");
   if (!normalized.startsWith(PENDING_PREFIX)) return String(text ?? "");
@@ -1251,17 +1265,18 @@ export default function ChatApp(props: Props) {
     }
     const content = currentInput;
     const trimmedContent = content.trim();
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((message) => {
+        if (message.role !== "assistant") return false;
+        const normalized = stripPendingPrefix(String(message.content ?? "")).trim();
+        if (!normalized) return false;
+        if (normalized === PENDING_PREFIX) return false;
+        return true;
+      });
     let promptOverride: string | undefined;
+    let followupResultContext: string | undefined;
     if (isRevisionEnabledAgent(currentAgent)) {
-      const lastAssistant = [...messages]
-        .reverse()
-        .find((message) => {
-          if (message.role !== "assistant") return false;
-          const normalized = stripPendingPrefix(String(message.content ?? "")).trim();
-          if (!normalized) return false;
-          if (normalized === PENDING_PREFIX) return false;
-          return true;
-        });
       const shouldUseRevisionMode =
         !!lastAssistant &&
         (isRevisionIntent(trimmedContent) ||
@@ -1281,6 +1296,16 @@ export default function ChatApp(props: Props) {
             lastPrompt,
             referencedContext
           });
+        }
+      }
+    }
+    if (isMaterialTaggingAgent(currentAgent) && lastAssistant) {
+      const shouldUseFollowupMode =
+        isRevisionIntent(trimmedContent) || !isLikelyFullInitialInput(trimmedContent);
+      if (shouldUseFollowupMode) {
+        const lastResult = stripPendingPrefix(String(lastAssistant.content ?? "")).trim();
+        if (lastResult) {
+          followupResultContext = lastResult;
         }
       }
     }
@@ -1337,7 +1362,8 @@ export default function ChatApp(props: Props) {
           body: JSON.stringify({
             content,
             stream: true,
-            promptOverride
+            promptOverride,
+            followupResultContext
           })
         }
       );
@@ -1839,6 +1865,7 @@ export default function ChatApp(props: Props) {
       if (slug === "nine-grid") return "九宫格";
       if (slug === "course-outline") return "课纲";
       if (slug === "course-transcript") return "课程";
+      if (slug === "material-tagging-assistant") return "素材标记";
       return fallback;
     },
     []
@@ -2441,7 +2468,8 @@ export default function ChatApp(props: Props) {
                               currentAgent?.slug === "positioning-helper" ||
                               currentAgent?.slug === "four-things" ||
                               currentAgent?.slug === "product-one-pager" ||
-                              currentAgent?.slug === "course-outline") ? (
+                              currentAgent?.slug === "course-outline" ||
+                              currentAgent?.slug === "material-tagging-assistant") ? (
                               <button
                                 type="button"
                                 className="hover:text-slate-700 transition-colors"
@@ -3133,6 +3161,7 @@ export default function ChatApp(props: Props) {
                       <option value="九宫格">九宫格</option>
                       <option value="课纲">课纲</option>
                       <option value="课程">课程</option>
+                      <option value="素材标记">素材标记</option>
                     </select>
                   </div>
                   <div>

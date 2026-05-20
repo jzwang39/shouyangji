@@ -1345,19 +1345,26 @@ export function buildPositioningPrompt(description: string) {
 
 function getDefaultPromptTemplate(slug: string) {
   const normalized = normalizeAgentSlug(slug);
+  console.log(`[getDefaultPromptTemplate] 被调用，slug: ${slug}, normalized: ${normalized}`);
+  
   if (normalized === "product-one-pager") {
+    console.log(`[getDefaultPromptTemplate] 返回 product-one-pager 默认模板`);
     return buildProductOnePagerPrompt("{{content}}");
   }
   if (normalized === "positioning-helper") {
+    console.log(`[getDefaultPromptTemplate] 返回 positioning-helper 默认模板`);
     return buildPositioningPrompt("{{description}}");
   }
   if (normalized === "four-things") {
+    console.log(`[getDefaultPromptTemplate] 返回 four-things 默认模板`);
     return buildFourThingsPrompt("{{content}}");
   }
   if (normalized === "nine-grid") {
+    console.log(`[getDefaultPromptTemplate] 返回 nine-grid 默认模板`);
     return buildNineGridPrompt("{{content}}");
   }
   if (normalized === "course-outline") {
+    console.log(`[getDefaultPromptTemplate] 返回 course-outline 默认模板`);
     return `根据输入的四件事信息{{shijianshi}}和九宫格信息{{jiugongge}}，请完成以下任务：
 
 1、先梳理四件事和九宫格之间的详细对应关系。
@@ -1377,12 +1384,30 @@ function getDefaultPromptTemplate(slug: string) {
 请用结构化方式输出 15 节课的大纲（标明阶段、节次、课程标题、课程目标、核心内容要点），整体控制在 10000 字以内。`;
   }
   if (normalized === "course-transcript") {
+    console.log(`[getDefaultPromptTemplate] 返回 course-transcript 默认模板`);
     return `根据输入的定位信息{{dingwei}}，产品信息{{chanpin}}、四件事儿{{shijianshi}}、九宫格{{jiugongge}}、四件事和九宫格的关系{{guanxi}}，按照每一节产品课程大纲（带12步结构）{{kegang}}的内容框架，扩写成一个60分钟的课程话术稿。
 其中{{lastkegang}}是上一节课的内容，注意扩写本节内容的时候流畅衔接。
 扩写的内容中如果遇到案例、数据，要保证真实有效，有出处，不能编造。
   
 结果控制在8000个字左右。`;
   }
+  if (normalized === "material-tagging-assistant") {
+    console.log(`[getDefaultPromptTemplate] 返回 material-tagging-assistant 默认模板`);
+    return `你是一位专业的素材标记专家，擅长对各种类型的素材（文本、图片、视频等）进行智能标记和分类。请根据用户提供的素材内容，进行以下工作：
+1. 提取素材的关键信息点
+2. 为素材添加合适的标签和分类
+3. 识别素材的主题、情感倾向、适用场景
+4. 提供素材的元数据建议（如标题、描述、关键词等）
+5. 根据素材内容推荐相关的标记策略
+
+请确保标记准确、分类合理，能够帮助用户更好地管理和检索素材。`;
+  }
+  if (normalized === "experiment-design-assistant") {
+    console.log(`[getDefaultPromptTemplate] 返回 experiment-design-assistant 默认模板`);
+    return `你是一位资深的实验设计专家，擅长设计科学严谨的实验方案。请根据用户提供的实验目标和条件，设计完整的实验方案，包括：实验假设、自变量和因变量、控制变量、实验组和对照组设计、样本量计算、数据收集方法、统计分析方法等。确保实验设计符合科学原则，能够有效验证假设。`;
+  }
+  
+  console.log(`[getDefaultPromptTemplate] 没有匹配的slug，返回空字符串`);
   return "";
 }
 
@@ -1408,6 +1433,12 @@ function normalizeAgentSlug(slug: string) {
   }
   if (normalized === "coursetranscript" || normalized === "course_transcript") {
     return "course-transcript";
+  }
+  if (normalized === "material-tagging" || normalized === "material_tagging") {
+    return "material-tagging-assistant";
+  }
+  if (normalized === "experiment-design" || normalized === "experiment_design") {
+    return "experiment-design-assistant";
   }
   return normalized;
 }
@@ -1553,6 +1584,9 @@ function buildPromptByTemplate(slug: string, template: string, content: string) 
 
 export async function buildPromptForAgent(slug: string, content: string) {
   const normalizedSlug = normalizeAgentSlug(slug);
+  console.log(`[buildPromptForAgent] 开始构建提示词，slug: ${slug}, normalizedSlug: ${normalizedSlug}, content长度: ${content.length}`);
+  
+  // 首先尝试使用传入的slug查询
   const rows = await query<{ prompt: string | null; system_prompt: string | null }>(
     `SELECT p.prompt, a.system_prompt
      FROM agents a
@@ -1561,9 +1595,15 @@ export async function buildPromptForAgent(slug: string, content: string) {
      LIMIT 1`,
     [slug]
   );
-  let fallbackRows: { prompt: string | null; system_prompt: string | null }[] = [];
-  if ((!rows[0]?.prompt && !rows[0]?.system_prompt) && normalizedSlug !== slug) {
-    fallbackRows = await query<{ prompt: string | null; system_prompt: string | null }>(
+  
+  console.log(`[buildPromptForAgent] 第一次查询结果: ${rows.length} 条记录`);
+  let row = rows[0];
+  
+  // 如果第一次查询没有找到记录，或者找到的记录中prompt和system_prompt都为空
+  // 并且normalizedSlug与slug不同，则使用normalizedSlug再次查询
+  if ((!row?.prompt && !row?.system_prompt) && normalizedSlug !== slug) {
+    console.log(`[buildPromptForAgent] 尝试使用normalizedSlug查询: ${normalizedSlug}`);
+    const fallbackRows = await query<{ prompt: string | null; system_prompt: string | null }>(
       `SELECT p.prompt, a.system_prompt
        FROM agents a
        LEFT JOIN agent_prompts p ON p.agent_slug = a.slug
@@ -1571,14 +1611,57 @@ export async function buildPromptForAgent(slug: string, content: string) {
        LIMIT 1`,
       [normalizedSlug]
     );
+    console.log(`[buildPromptForAgent] fallback查询结果: ${fallbackRows.length} 条记录`);
+    if (fallbackRows.length > 0) {
+      row = fallbackRows[0];
+      console.log(`[buildPromptForAgent] fallback prompt: ${row.prompt ? '有值，长度=' + row.prompt.length : 'NULL'}`);
+    }
   }
-  const row = rows[0] ?? fallbackRows[0];
-  const template =
-    (row?.prompt ?? "").trim() ||
-    (row?.system_prompt ?? "").trim() ||
-    getDefaultPromptTemplate(normalizedSlug);
+  
+  console.log(`[buildPromptForAgent] 最终使用的row: ${row ? '有值' : 'NULL'}`);
+  
+  if (row) {
+    console.log(`[buildPromptForAgent] prompt字段: ${row.prompt ? '有值，长度=' + row.prompt.length : 'NULL'}`);
+    console.log(`[buildPromptForAgent] system_prompt字段: ${row.system_prompt ? '有值，长度=' + row.system_prompt.length : 'NULL'}`);
+    
+    if (row.prompt) {
+      console.log(`[buildPromptForAgent] prompt前200字符: ${row.prompt.substring(0, 200)}...`);
+    }
+  }
+  
+  // 优先级：agent_prompts.prompt > agents.system_prompt > 默认模板
+  const promptTrimmed = row?.prompt ? row.prompt.trim() : "";
+  const systemPromptTrimmed = row?.system_prompt ? row.system_prompt.trim() : "";
+  
+  console.log(`[buildPromptForAgent] promptTrimmed长度: ${promptTrimmed.length}`);
+  console.log(`[buildPromptForAgent] systemPromptTrimmed长度: ${systemPromptTrimmed.length}`);
+  console.log(`[buildPromptForAgent] promptTrimmed是否为空: ${!promptTrimmed}`);
+  console.log(`[buildPromptForAgent] systemPromptTrimmed是否为空: ${!systemPromptTrimmed}`);
+  
+  let template = "";
+  let templateSource = "";
+  
+  if (promptTrimmed) {
+    template = promptTrimmed;
+    templateSource = "agent_prompts.prompt";
+  } else if (systemPromptTrimmed) {
+    template = systemPromptTrimmed;
+    templateSource = "agents.system_prompt";
+  } else {
+    template = getDefaultPromptTemplate(normalizedSlug);
+    templateSource = "getDefaultPromptTemplate";
+  }
+    
+  console.log(`[buildPromptForAgent] 选择的模板长度: ${template.length}`);
+  console.log(`[buildPromptForAgent] 模板前200字符: ${template.substring(0, 200)}...`);
+  console.log(`[buildPromptForAgent] 模板来源: ${templateSource}`);
+  
   if (!template) {
+    console.log(`[buildPromptForAgent] 模板为空，返回原始内容`);
     return content;
   }
-  return buildPromptByTemplate(normalizedSlug, template, content);
+  
+  const result = buildPromptByTemplate(normalizedSlug, template, content);
+  console.log(`[buildPromptForAgent] 最终提示词长度: ${result.length}`);
+  return result;
 }
