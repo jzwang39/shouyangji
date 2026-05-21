@@ -26,6 +26,9 @@ const AI_AGENT_SLUGS = new Set([
   "course-transcript",
   "material-tagging-assistant",
   "deterministic-material-capture-assistant",
+  "crisis-material-capture-assistant",
+  "science-popularization-material-capture-assistant",
+  "keyword-material-capture-assistant",
   "experiment-design-assistant"
 ]);
 
@@ -38,13 +41,64 @@ const REVISION_ENABLED_SLUGS = new Set([
   "nine-grid",
   "course-outline",
   "experiment-design-assistant",
-  "deterministic-material-capture-assistant"
+  "deterministic-material-capture-assistant",
+  "crisis-material-capture-assistant",
+  "science-popularization-material-capture-assistant",
+  "keyword-material-capture-assistant"
 ]);
 
-function isAiAgent(slug: string, agentName: string) {
-  const normalizedSlug = String(slug ?? "")
+function normalizeAgentSlug(slug: string) {
+  const normalized = String(slug ?? "")
     .trim()
     .toLowerCase();
+  if (
+    normalized === "deterministic-material-capture" ||
+    normalized === "deterministic_material_capture"
+  ) {
+    return "deterministic-material-capture-assistant";
+  }
+  if (
+    normalized === "crisis-material-capture" ||
+    normalized === "crisis_material_capture"
+  ) {
+    return "crisis-material-capture-assistant";
+  }
+  if (
+    normalized === "science-popularization-material-capture" ||
+    normalized === "science_popularization_material_capture"
+  ) {
+    return "science-popularization-material-capture-assistant";
+  }
+  if (
+    normalized === "keyword-material-capture" ||
+    normalized === "keyword_material_capture"
+  ) {
+    return "keyword-material-capture-assistant";
+  }
+  return normalized;
+}
+
+function isMaterialCaptureAgent(slug: string, agentName: string) {
+  const normalizedSlug = normalizeAgentSlug(slug);
+  if (
+    normalizedSlug === "deterministic-material-capture-assistant" ||
+    normalizedSlug === "crisis-material-capture-assistant" ||
+    normalizedSlug === "science-popularization-material-capture-assistant" ||
+    normalizedSlug === "keyword-material-capture-assistant"
+  ) {
+    return true;
+  }
+  const name = String(agentName ?? "").trim();
+  return (
+    name.includes("确定性素材抓取") ||
+    name.includes("危机素材抓取") ||
+    name.includes("科普素材抓取") ||
+    name.includes("重点词素材抓取")
+  );
+}
+
+function isAiAgent(slug: string, agentName: string) {
+  const normalizedSlug = normalizeAgentSlug(slug);
   if (AI_AGENT_SLUGS.has(normalizedSlug)) return true;
   const name = String(agentName ?? "").trim();
   if (!name) return false;
@@ -59,14 +113,15 @@ function isAiAgent(slug: string, agentName: string) {
     name.includes("实验") ||
     name.includes("素材标记") ||
     name.includes("素材") ||
-    name.includes("确定性素材抓取")
+    name.includes("确定性素材抓取") ||
+    name.includes("危机素材抓取") ||
+    name.includes("科普素材抓取") ||
+    name.includes("重点词素材抓取")
   );
 }
 
 function isRevisionEnabledAgent(slug: string, agentName: string) {
-  const normalizedSlug = String(slug ?? "")
-    .trim()
-    .toLowerCase();
+  const normalizedSlug = normalizeAgentSlug(slug);
   if (REVISION_ENABLED_SLUGS.has(normalizedSlug)) return true;
   const name = String(agentName ?? "").trim();
   if (!name) return false;
@@ -77,7 +132,10 @@ function isRevisionEnabledAgent(slug: string, agentName: string) {
     name.includes("课纲") ||
     name.includes("实验设计") ||
     name.includes("实验") ||
-    name.includes("确定性素材抓取")
+    name.includes("确定性素材抓取") ||
+    name.includes("危机素材抓取") ||
+    name.includes("科普素材抓取") ||
+    name.includes("重点词素材抓取")
   );
 }
 
@@ -230,18 +288,25 @@ ${content}`;
 
     if (isAiAgent(conversation.slug, conversation.agent_name)) {
       console.log(`[API] 处理AI智能体消息，slug: ${conversation.slug}, agent_name: ${conversation.agent_name}`);
+      const normalizedConversationSlug = normalizeAgentSlug(conversation.slug);
+      const isMaterialCaptureConversation = isMaterialCaptureAgent(
+        conversation.slug,
+        conversation.agent_name
+      );
       const promptOverride =
         isRevisionEnabledAgent(conversation.slug, conversation.agent_name) &&
+        !isMaterialCaptureConversation &&
         rawPromptOverride
           ? rawPromptOverride
           : "";
       console.log(`[API] promptOverride: ${promptOverride ? '有值' : '空'}`);
       const isMaterialTaggingConversation =
-        String(conversation.slug ?? "").trim().toLowerCase() ===
-          "material-tagging-assistant" ||
+        normalizedConversationSlug === "material-tagging-assistant" ||
         String(conversation.agent_name ?? "").includes("素材标记");
       const promptContent =
-        isMaterialTaggingConversation && followupResultContext
+        (isMaterialTaggingConversation ||
+          isMaterialCaptureConversation) &&
+        followupResultContext
           ? `以下是最近一次生成的结果信息：
 ${followupResultContext}
 

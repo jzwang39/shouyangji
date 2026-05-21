@@ -167,6 +167,96 @@ function AgentMenuIcon({ slug }: { slug: string }) {
       </svg>
     );
   }
+  if (slug === "material-tagging-assistant") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M20 12V7a2 2 0 0 0-2-2h-5l-7 7 6 6 7-7v-5z" />
+        <circle cx="15" cy="9" r="1" />
+      </svg>
+    );
+  }
+  if (slug === "deterministic-material-capture-assistant") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="M21 21l-4.35-4.35" />
+        <path d="M8 11l2 2 4-4" />
+      </svg>
+    );
+  }
+  if (slug === "crisis-material-capture-assistant") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
+      </svg>
+    );
+  }
+  if (slug === "keyword-material-capture-assistant") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M10 13a5 5 0 1 1 3.54-8.54A5 5 0 0 1 10 13z" />
+        <path d="m14 14 7 7" />
+        <path d="M10 8v4" />
+        <path d="M8 10h4" />
+      </svg>
+    );
+  }
+  if (slug === "experiment-design-assistant") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M10 2v6l-5.5 9.5A2 2 0 0 0 6.24 21h11.52a2 2 0 0 0 1.74-3.5L14 8V2" />
+        <path d="M8.5 2h7" />
+        <path d="M8 14h8" />
+      </svg>
+    );
+  }
   return (
     <svg
       className={className}
@@ -332,7 +422,10 @@ const REVISION_ENABLED_SLUGS = new Set([
   "nine-grid",
   "course-outline",
   "experiment-design-assistant",
-  "deterministic-material-capture-assistant"
+  "deterministic-material-capture-assistant",
+  "crisis-material-capture-assistant",
+  "science-popularization-material-capture-assistant",
+  "keyword-material-capture-assistant"
 ]);
 
 function isRevisionEnabledAgent(agent: Agent | null | undefined) {
@@ -350,7 +443,10 @@ function isRevisionEnabledAgent(agent: Agent | null | undefined) {
     name.includes("课纲") ||
     name.includes("实验设计") ||
     name.includes("实验") ||
-    name.includes("确定性素材抓取")
+    name.includes("确定性素材抓取") ||
+    name.includes("危机素材抓取") ||
+    name.includes("科普素材抓取") ||
+    name.includes("重点词素材抓取")
   );
 }
 
@@ -444,6 +540,57 @@ function isDeterministicMaterialCaptureAgent(agent: Agent | null | undefined) {
   return name.includes("确定性素材抓取");
 }
 
+function isCrisisMaterialCaptureAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "crisis-material-capture-assistant" ||
+    slug === "crisis-material-capture" ||
+    slug === "crisis_material_capture"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("危机素材抓取");
+}
+
+function isSciencePopularizationMaterialCaptureAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "science-popularization-material-capture-assistant" ||
+    slug === "science-popularization-material-capture" ||
+    slug === "science_popularization_material_capture"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("科普素材抓取");
+}
+
+function isKeywordMaterialCaptureAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "keyword-material-capture-assistant" ||
+    slug === "keyword-material-capture" ||
+    slug === "keyword_material_capture"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("重点词素材抓取");
+}
+
+function isAnyMaterialCaptureAgent(agent: Agent | null | undefined) {
+  return (
+    isDeterministicMaterialCaptureAgent(agent) ||
+    isCrisisMaterialCaptureAgent(agent) ||
+    isSciencePopularizationMaterialCaptureAgent(agent) ||
+    isKeywordMaterialCaptureAgent(agent)
+  );
+}
+
 function stripPendingPrefix(text: string) {
   const normalized = String(text ?? "").replace(/\r\n/g, "\n");
   if (!normalized.startsWith(PENDING_PREFIX)) return String(text ?? "");
@@ -479,7 +626,7 @@ function normalizeMessagesForDisplay(
   messages: Message[],
   agent: Agent | null | undefined
 ) {
-  if (!isMaterialTaggingAgent(agent) && !isDeterministicMaterialCaptureAgent(agent)) {
+  if (!isMaterialTaggingAgent(agent) && !isAnyMaterialCaptureAgent(agent)) {
     return messages;
   }
 
@@ -725,6 +872,7 @@ export default function ChatApp(props: Props) {
     currentLessonOutline?: string;
     courseLessonCount?: string;
     courseRuleContent?: string;
+    materialTaggingContent?: string;
   } | null>(null);
   const [courseRules, setCourseRules] = useState<CourseRuleRow[]>([]);
   const [generatingConversationId, setGeneratingConversationId] = useState<
@@ -1040,7 +1188,8 @@ export default function ChatApp(props: Props) {
           isCourseOutlineAgent(currentAgent) ||
           isCourseTranscriptAgent(currentAgent) ||
           isFourThingsAgent(currentAgent) ||
-          isNineGridAgent(currentAgent)
+          isNineGridAgent(currentAgent) ||
+          isAnyMaterialCaptureAgent(currentAgent)
         ) {
           const queries: {
             key:
@@ -1048,7 +1197,8 @@ export default function ChatApp(props: Props) {
               | "fourThingsContent"
               | "nineGridContent"
               | "courseOutlineContent"
-              | "positioningContent";
+              | "positioningContent"
+              | "materialTaggingContent";
             agentName: string;
           }[] =
             isCourseOutlineAgent(currentAgent)
@@ -1064,9 +1214,17 @@ export default function ChatApp(props: Props) {
                   { key: "nineGridContent", agentName: "九宫格" },
                   { key: "courseOutlineContent", agentName: "课纲" }
                 ]
-              : [
+              : isFourThingsAgent(currentAgent) || isNineGridAgent(currentAgent)
+              ? [
                   { key: "content", agentName: "产品一页纸" },
                   { key: "positioningContent", agentName: "定位" }
+                ]
+              : isAnyMaterialCaptureAgent(currentAgent)
+              ? [
+                  { key: "materialTaggingContent", agentName: "素材标记" }
+                ]
+              : [
+                  { key: "content", agentName: "产品一页纸" }
                 ];
           const results = await Promise.all(
             queries.map(async ({ key, agentName }) => {
@@ -1088,8 +1246,8 @@ export default function ChatApp(props: Props) {
           setReferenceForm((prev) =>
             prev
               ? results.reduce(
-                  (acc, { key, content }) => ({
-                    ...acc,
+                  (prevForm, { key, content }) => ({
+                    ...prevForm,
                     [key]: content
                   }),
                   prev
@@ -1339,7 +1497,7 @@ export default function ChatApp(props: Props) {
       });
     let promptOverride: string | undefined;
     let followupResultContext: string | undefined;
-    if (isRevisionEnabledAgent(currentAgent)) {
+    if (isRevisionEnabledAgent(currentAgent) && !isAnyMaterialCaptureAgent(currentAgent)) {
       const shouldUseRevisionMode =
         !!lastAssistant &&
         (isRevisionIntent(trimmedContent) ||
@@ -1362,7 +1520,7 @@ export default function ChatApp(props: Props) {
         }
       }
     }
-    if (isMaterialTaggingAgent(currentAgent) && lastAssistant) {
+    if ((isMaterialTaggingAgent(currentAgent) || isAnyMaterialCaptureAgent(currentAgent)) && lastAssistant) {
       const shouldUseFollowupMode =
         isRevisionIntent(trimmedContent) || !isLikelyFullInitialInput(trimmedContent);
       if (shouldUseFollowupMode) {
@@ -1929,6 +2087,10 @@ export default function ChatApp(props: Props) {
       if (slug === "course-outline") return "课纲";
       if (slug === "course-transcript") return "课程";
       if (slug === "material-tagging-assistant") return "素材标记";
+      if (slug === "deterministic-material-capture-assistant") return "确定性素材抓取";
+      if (slug === "crisis-material-capture-assistant") return "危机素材抓取";
+      if (slug === "science-popularization-material-capture-assistant") return "科普素材抓取";
+      if (slug === "keyword-material-capture-assistant") return "重点词素材抓取";
       return fallback;
     },
     []
@@ -1978,7 +2140,8 @@ export default function ChatApp(props: Props) {
         !isFourThingsAgent(currentAgent) &&
         !isNineGridAgent(currentAgent) &&
         !isCourseOutlineAgent(currentAgent) &&
-        !isCourseTranscriptAgent(currentAgent))
+        !isCourseTranscriptAgent(currentAgent) &&
+        !isAnyMaterialCaptureAgent(currentAgent))
     ) {
       return;
     }
@@ -1991,7 +2154,8 @@ export default function ChatApp(props: Props) {
       currentLesson: "",
       currentLessonOutline: "",
       courseLessonCount: "",
-      courseRuleContent: ""
+      courseRuleContent: "",
+      materialTaggingContent: ""
     });
     setReferenceDialogOpen(true);
     try {
@@ -2606,7 +2770,8 @@ export default function ChatApp(props: Props) {
                   isFourThingsAgent(currentAgent) ||
                   isNineGridAgent(currentAgent) ||
                   isCourseOutlineAgent(currentAgent) ||
-                  isCourseTranscriptAgent(currentAgent)) ? (
+                  isCourseTranscriptAgent(currentAgent) ||
+                  isAnyMaterialCaptureAgent(currentAgent)) ? (
                   <button
                     type="button"
                     className="underline normal-case text-[11px] opacity-100"
@@ -2678,7 +2843,11 @@ export default function ChatApp(props: Props) {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="w-full max-w-lg max-h-[80vh] overflow-y-scroll rounded bg-white p-4 text-xs text-slate-900 custom-scrollbar">
                 <div className="mb-3 flex items-center justify-between">
-                  <div className="text-sm font-semibold">引用产品一页纸结果</div>
+                  <div className="text-sm font-semibold">
+                    {currentAgent && isAnyMaterialCaptureAgent(currentAgent)
+                      ? "引用素材标记结果"
+                      : "引用产品一页纸结果"}
+                  </div>
                   <button
                     type="button"
                     className="text-[11px] text-slate-500 hover:text-slate-800"
@@ -2977,6 +3146,28 @@ export default function ChatApp(props: Props) {
                         />
                       </div>
                     </>
+                  ) : isAnyMaterialCaptureAgent(currentAgent) ? (
+                    <>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-600">
+                          素材标记结果内容
+                        </label>
+                        <textarea
+                          className="h-40 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                          value={referenceForm.materialTaggingContent ?? ""}
+                          onChange={(event) =>
+                            setReferenceForm((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    materialTaggingContent: event.target.value
+                                  }
+                                : prev
+                            )
+                          }
+                        />
+                      </div>
+                    </>
                   ) : (
                     <>
                       <div>
@@ -3134,6 +3325,14 @@ export default function ChatApp(props: Props) {
                                   : extraSections.join("\n\n");
                             }
                           }
+                          if (isAnyMaterialCaptureAgent(currentAgent)) {
+                            const materialTaggingContent = (
+                              referenceForm.materialTaggingContent ?? ""
+                            ).trim();
+                            if (materialTaggingContent) {
+                              text = materialTaggingContent;
+                            }
+                          }
                         }
                         setCurrentInput(text);
                         if (currentConversationId) {
@@ -3226,6 +3425,9 @@ export default function ChatApp(props: Props) {
                       <option value="课程">课程</option>
                       <option value="素材标记">素材标记</option>
                       <option value="确定性素材抓取">确定性素材抓取</option>
+                      <option value="危机素材抓取">危机素材抓取</option>
+                      <option value="科普素材抓取">科普素材抓取</option>
+                      <option value="重点词素材抓取">重点词素材抓取</option>
                     </select>
                   </div>
                   <div>

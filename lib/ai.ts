@@ -1413,6 +1413,39 @@ function getDefaultPromptTemplate(slug: string) {
 
 请确保抓取过程具有确定性，提取结果准确无误，能够满足用户的素材需求。`;
   }
+  if (normalized === "crisis-material-capture-assistant") {
+    console.log(`[getDefaultPromptTemplate] 返回 crisis-material-capture-assistant 默认模板`);
+    return `你是一位专业的危机素材抓取专家，擅长从各种来源中抓取和提取危机相关的素材内容。请根据用户提供的来源和提取要求，进行以下工作：
+1. 分析来源内容中与危机相关的信息
+2. 识别和提取危机事件、风险因素、影响范围等关键信息
+3. 整理危机应对策略和预防措施
+4. 对危机素材进行分类和优先级排序
+5. 提供危机分析和预警建议
+
+请确保抓取过程全面准确，提取结果能够帮助用户有效识别和管理危机风险。`;
+  }
+  if (normalized === "science-popularization-material-capture-assistant") {
+    console.log(`[getDefaultPromptTemplate] 返回 science-popularization-material-capture-assistant 默认模板`);
+    return `你是一位专业的科普素材抓取专家，擅长从各种来源中抓取和提取科普相关的素材内容。请根据用户提供的来源和提取要求，进行以下工作：
+1. 分析来源内容中的科学知识和科普信息
+2. 识别和提取科学原理、技术概念、实验方法等关键信息
+3. 整理科普知识的解释和说明
+4. 对科普素材进行分类和难度分级
+5. 提供科普教育的建议和应用场景
+
+请确保抓取过程准确全面，提取结果能够帮助用户有效理解和传播科学知识。`;
+  }
+  if (normalized === "keyword-material-capture-assistant") {
+    console.log(`[getDefaultPromptTemplate] 返回 keyword-material-capture-assistant 默认模板`);
+    return `你是一位专业的重点词素材抓取专家，擅长从各种来源中抓取和提取重点词相关的素材内容。请根据用户提供的来源和提取要求，进行以下工作：
+1. 分析来源内容中的重点词和核心概念
+2. 识别和提取关键词、重要术语、核心观点等关键信息
+3. 整理重点词的分类和关联关系
+4. 对重点词素材进行优先级排序和重要性评估
+5. 提供重点词应用场景和使用建议
+
+请确保抓取过程精准高效，提取结果能够帮助用户快速掌握核心内容和关键信息。`;
+  }
   if (normalized === "experiment-design-assistant") {
     console.log(`[getDefaultPromptTemplate] 返回 experiment-design-assistant 默认模板`);
     return `你是一位资深的实验设计专家，擅长设计科学严谨的实验方案。请根据用户提供的实验目标和条件，设计完整的实验方案，包括：实验假设、自变量和因变量、控制变量、实验组和对照组设计、样本量计算、数据收集方法、统计分析方法等。确保实验设计符合科学原则，能够有效验证假设。`;
@@ -1453,6 +1486,15 @@ function normalizeAgentSlug(slug: string) {
   }
   if (normalized === "deterministic-material-capture" || normalized === "deterministic_material_capture") {
     return "deterministic-material-capture-assistant";
+  }
+  if (normalized === "crisis-material-capture" || normalized === "crisis_material_capture") {
+    return "crisis-material-capture-assistant";
+  }
+  if (normalized === "science-popularization-material-capture" || normalized === "science_popularization_material_capture") {
+    return "science-popularization-material-capture-assistant";
+  }
+  if (normalized === "keyword-material-capture" || normalized === "keyword_material_capture") {
+    return "keyword-material-capture-assistant";
   }
   return normalized;
 }

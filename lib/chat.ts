@@ -37,6 +37,9 @@ export async function listAgents(): Promise<Agent[]> {
     "course-transcript",
     "material-tagging-assistant",
     "deterministic-material-capture-assistant",
+    "crisis-material-capture-assistant",
+    "science-popularization-material-capture-assistant",
+    "keyword-material-capture-assistant",
     "experiment-design-assistant"
   ];
   
