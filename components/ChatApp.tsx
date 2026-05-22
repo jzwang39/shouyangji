@@ -582,6 +582,20 @@ function isKeywordMaterialCaptureAgent(agent: Agent | null | undefined) {
   return name.includes("重点词素材抓取");
 }
 
+function isExperimentDesignAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "experiment-design-assistant" ||
+    slug === "experiment-design" ||
+    slug === "experiment_design"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("实验设计助手") || name.includes("实验设计");
+}
+
 function isAnyMaterialCaptureAgent(agent: Agent | null | undefined) {
   return (
     isDeterministicMaterialCaptureAgent(agent) ||
@@ -1497,7 +1511,11 @@ export default function ChatApp(props: Props) {
       });
     let promptOverride: string | undefined;
     let followupResultContext: string | undefined;
-    if (isRevisionEnabledAgent(currentAgent) && !isAnyMaterialCaptureAgent(currentAgent)) {
+    if (
+      isRevisionEnabledAgent(currentAgent) &&
+      !isAnyMaterialCaptureAgent(currentAgent) &&
+      !isExperimentDesignAgent(currentAgent)
+    ) {
       const shouldUseRevisionMode =
         !!lastAssistant &&
         (isRevisionIntent(trimmedContent) ||

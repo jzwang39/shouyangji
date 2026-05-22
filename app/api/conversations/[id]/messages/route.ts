@@ -293,9 +293,13 @@ ${content}`;
         conversation.slug,
         conversation.agent_name
       );
+      const isExperimentDesignConversation =
+        normalizedConversationSlug === "experiment-design-assistant" ||
+        String(conversation.agent_name ?? "").includes("实验设计");
       const promptOverride =
         isRevisionEnabledAgent(conversation.slug, conversation.agent_name) &&
         !isMaterialCaptureConversation &&
+        !isExperimentDesignConversation &&
         rawPromptOverride
           ? rawPromptOverride
           : "";
@@ -328,13 +332,16 @@ ${content}`
         | Array<{ role: "system" | "user" | "assistant"; content: string }>
         | undefined;
 
-      if (conversation.slug === "product-one-pager") {
-        const systemPrompt = await buildPromptForAgent(conversation.slug, "");
+      if (
+        normalizedConversationSlug === "product-one-pager" ||
+        isExperimentDesignConversation
+      ) {
         const historyRows = await query<{
+          id: number;
           role: "user" | "assistant" | "system";
           content: string;
         }>(
-          "SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC",
+          "SELECT id, role, content FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC",
           [conversationId]
         );
         const historyMessages = historyRows
@@ -355,6 +362,7 @@ ${content}`
             const trimmed = normalizedContent.trim();
             if (!trimmed) return null;
             return {
+              id: row.id,
               role: row.role,
               content: trimmed
             };
@@ -362,11 +370,32 @@ ${content}`
           .filter(
             (
               item
-            ): item is { role: "system" | "user" | "assistant"; content: string } =>
+            ): item is {
+              id: number;
+              role: "system" | "user" | "assistant";
+              content: string;
+            } =>
               !!item
           );
-        aiMessages = [{ role: "system", content: systemPrompt }, ...historyMessages];
-        prompt = systemPrompt;
+
+        if (isExperimentDesignConversation) {
+          const previousHistory = historyMessages
+            .filter((item) => item.id !== messageId)
+            .map(({ role, content }) => ({ role, content }));
+          aiMessages = [
+            { role: "system", content: prompt },
+            ...previousHistory,
+            { role: "user", content }
+          ];
+        } else {
+          const systemPrompt = await buildPromptForAgent(conversation.slug, "");
+          const normalizedHistory = historyMessages.map(({ role, content }) => ({
+            role,
+            content
+          }));
+          aiMessages = [{ role: "system", content: systemPrompt }, ...normalizedHistory];
+          prompt = systemPrompt;
+        }
       }
 
       aiPrompt = prompt;
