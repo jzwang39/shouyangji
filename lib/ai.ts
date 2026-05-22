@@ -941,6 +941,36 @@ export async function callAiWithPrompt(
   const sleep = (ms: number) =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+  const isNineGridPrompt = (text: string) => {
+    const source = String(text ?? "");
+    return (
+      (source.includes("九宫格") || source.includes("九、破价")) &&
+      source.includes("一、") &&
+      source.includes("九、")
+    );
+  };
+
+  const hasStructuredSection = (text: string, marker: string) => {
+    const source = String(text ?? "");
+    const escaped = escapeRegExp(marker);
+    return new RegExp(`(^|\\n)\\s*(?:\\*\\*)?${escaped}`, "m").test(source);
+  };
+
+  const isNineGridOutputCompleteEnough = (text: string) => {
+    return (
+      hasStructuredSection(text, "八、") &&
+      hasStructuredSection(text, "九、")
+    );
+  };
+
+  const shouldForceContinue = (basePrompt: string, text: string) => {
+    if (!text.trim()) return false;
+    if (isNineGridPrompt(basePrompt)) {
+      return !isNineGridOutputCompleteEnough(text);
+    }
+    return false;
+  };
+
   const getNetworkCause = (error: any) => {
     if (!error || typeof error !== "object") return null;
     const cause = "cause" in error ? (error as any).cause : null;
@@ -1228,14 +1258,18 @@ export async function callAiWithPrompt(
 
         for (let i = 0; i < 10; i += 1) {
           if (finishReason === "stop") {
-            console.log(`[AI Loop] Finish reason is 'stop'. Assuming complete.`);
-            break;
+            if (shouldForceContinue(prompt, fullContent)) {
+              console.log("[AI Loop] Finish reason is 'stop' but structured output is incomplete. Forcing continuation...");
+            } else {
+              console.log(`[AI Loop] Finish reason is 'stop'. Assuming complete.`);
+              break;
+            }
           }
 
           if (finishReason !== "length") {
             // Heuristic: if content looks incomplete and we haven't hit the loop limit, try to continue
             // This handles cases where model returns 'stop' prematurely or provider doesn't support 'length'
-            if (isIncomplete(fullContent) && i < 10) {
+            if ((isIncomplete(fullContent) || shouldForceContinue(prompt, fullContent)) && i < 10) {
                console.log(`[AI Loop] Content looks incomplete but finishReason is '${finishReason}'. Forcing continuation...`);
             } else {
                console.log(`[AI Loop] Breaking because finishReason is not 'length' (is '${finishReason}') and content looks complete`);
@@ -1702,12 +1736,6 @@ function buildPromptByTemplate(slug: string, template: string, content: string) 
   if (slug === "experiment-design-assistant") {
     console.log(`[buildPromptByTemplate] 处理实验设计助手，content长度: ${content.length}`);
     console.log(`[buildPromptByTemplate] content前200字符: ${content.substring(0, 200)}...`);
-    
-    const basePrompt = renderTemplate(template, {
-      content,
-      description: content,
-      ...parsedVars
-    });
 
     const isStartMessage = isExperimentDesignStartMessage(content);
     const looksLikeProductInfo = looksLikeExperimentDesignProductInfo(content);
