@@ -1559,6 +1559,74 @@ function parseStructuredContent(content: string, customKeys?: { key: string; lab
   return { hasHeaders, result };
 }
 
+function isExperimentDesignStartMessage(content: string) {
+  const text = String(content ?? "").trim();
+  if (!text) return false;
+  if (text.length > 30) return false;
+  
+  console.log(`[isExperimentDesignStartMessage] 检查内容: "${text}", 长度: ${text.length}`);
+  
+  const isStartMessage = /^(开始|开始吧|你好|您好|hi|hello|我要设计实验|设计实验|我要做实验|帮我设计实验|实验设计)$/i.test(text);
+  
+  console.log(`[isExperimentDesignStartMessage] 识别结果: ${isStartMessage}`);
+  return isStartMessage;
+}
+
+function looksLikeExperimentDesignProductInfo(content: string) {
+  const text = String(content ?? "").trim();
+  if (!text) return false;
+  
+  console.log(`[looksLikeExperimentDesignProductInfo] 检查内容，长度: ${text.length}`);
+  console.log(`[looksLikeExperimentDesignProductInfo] 内容前200字符: ${text.substring(0, 200)}...`);
+
+  // 更全面的字段识别模式
+  const fieldPatterns = [
+    /产品名称|品名|名称|【产品名称】|【名称】|产品名|产品：/i,
+    /产品成分|成分|配方|添加量|【产品成分】|【成分】|核心成分|主要成分|原料/i,
+    /产品功效|功效|作用|【产品功效】|【功效】|效果|功能|益处/i,
+    /产品理论基础|理论基础|作用机制|机制|原理|【产品理论基础】|【理论基础】|科学原理|作用原理/i,
+    /实验要求|实验场地|时间限制|特殊要求|实验时间|【实验要求】|【要求】|演示要求|现场要求/i
+  ];
+  
+  const matchedFields = fieldPatterns.map((pattern, index) => ({
+    index,
+    matched: pattern.test(text)
+  })).filter(field => field.matched);
+  
+  const matchedFieldCount = matchedFields.length;
+  
+  console.log(`[looksLikeExperimentDesignProductInfo] 匹配字段数: ${matchedFieldCount}`);
+  console.log(`[looksLikeExperimentDesignProductInfo] 匹配字段: ${matchedFields.map(f => f.index).join(', ')}`);
+  
+  // 更宽松的识别条件
+  if (matchedFieldCount >= 2) {
+    console.log(`[looksLikeExperimentDesignProductInfo] 识别为产品信息（匹配字段>=2）`);
+    return true;
+  }
+  
+  // 如果内容较长且包含产品相关信息
+  if (text.length >= 30) {
+    // 检查是否包含产品描述性内容
+    const hasProductDescription = /产品|成分|功效|实验|演示|效果|功能|作用/i.test(text);
+    const hasColonSeparatedInfo = /[:：]\s*[^:：]+/i.test(text);
+    const hasDashSeparatedInfo = /[-—]\s*[^-—]+/i.test(text);
+    
+    if (hasProductDescription && (hasColonSeparatedInfo || hasDashSeparatedInfo)) {
+      console.log(`[looksLikeExperimentDesignProductInfo] 识别为产品信息（描述性内容）`);
+      return true;
+    }
+  }
+  
+  // 检查是否包含示例格式
+  if (/填写示例|示例：|例如：|比如：/i.test(text)) {
+    console.log(`[looksLikeExperimentDesignProductInfo] 识别为产品信息（包含示例）`);
+    return true;
+  }
+  
+  console.log(`[looksLikeExperimentDesignProductInfo] 未识别为产品信息`);
+  return false;
+}
+
 function buildPromptByTemplate(slug: string, template: string, content: string) {
   const { hasHeaders, result: parsedVars } = parseStructuredContent(content);
   console.log(`[Prompt Build] Slug: ${slug}, Has Headers: ${hasHeaders}, Keys found: ${Object.keys(parsedVars).filter(k => parsedVars[k]).join(", ")}`);
@@ -1629,6 +1697,124 @@ function buildPromptByTemplate(slug: string, template: string, content: string) 
 【极其重要的强制指令】：
 通过大纲识别，当前你正在撰写的是【${currentLessonTitle || currentLessonLabel}】的逐字稿！
 你的输出标题必须以此开头，绝对不允许从第1节开始写！禁止出现“第一节”、“第1节”等无关字眼（除非当前真的是第1节），严格围绕【${currentLessonLabel}】展开！必须打破从头开始写的惯性！`;
+  }
+
+  if (slug === "experiment-design-assistant") {
+    console.log(`[buildPromptByTemplate] 处理实验设计助手，content长度: ${content.length}`);
+    console.log(`[buildPromptByTemplate] content前200字符: ${content.substring(0, 200)}...`);
+    
+    const basePrompt = renderTemplate(template, {
+      content,
+      description: content,
+      ...parsedVars
+    });
+
+    const isStartMessage = isExperimentDesignStartMessage(content);
+    const looksLikeProductInfo = looksLikeExperimentDesignProductInfo(content);
+    
+    console.log(`[buildPromptByTemplate] isStartMessage: ${isStartMessage}`);
+    console.log(`[buildPromptByTemplate] looksLikeProductInfo: ${looksLikeProductInfo}`);
+    
+    if (looksLikeProductInfo) {
+      console.log(`[buildPromptByTemplate] 识别为产品信息输入，添加强制指令`);
+      return `【系统强制指令 - 最高优先级】
+你当前正在处理实验设计助手请求。用户已经提供了产品信息，你必须立即进入第二步：接收产品信息。
+
+【用户输入的产品信息】：
+${content}
+
+【你必须执行的操作】：
+1. 立即提取并整理用户提供的所有产品信息
+2. 如果“产品名称、产品成分、产品功效”三项齐全：直接输出“信息确认卡”，然后询问实验方向
+3. 如果三项中有缺失：只追问缺失项，不要重复输出整个产品信息表
+4. 禁止再次回复“请先提供您的产品信息”或重复输出产品信息表
+5. 用户输入中出现的括号、方括号、顿号、分号、长句描述都属于有效产品信息格式，你必须识别
+
+【信息确认卡格式】：
+---
+✅ 好的！我已收到您的产品信息，整理如下：
+
+| 字段 | 内容 |
+|------|------|
+| 产品名称 | [用户填写的名称] |
+| 核心成分 | [提炼关键成分及比例] |
+| 产品功效 | [用户填写的功效] |
+| 理论基础 | [用户填写的理论基础，简洁提炼] |
+| 实验要求 | [用户填写的要求，若无则填"未指定，按通用标准设计"] |
+---
+
+基于以上产品信息，**下一步请告诉我您的实验方向**：
+
+**方式一（推荐）**：您直接告诉我您想做哪几个实验，越具体越好。
+
+> 例如：「我想做三个实验：① 小分子穿透实验 ② 快速充能实验 ③ 免疫激活实验」
+
+**方式二**：如果您暂时没有具体想法，可以回复「**帮我设计**」，我来根据您的产品特性，为您推荐最适合的实验方向。
+
+【注意】：输出信息确认卡后，等待用户输入实验方向，不要继续输出任何内容。`;
+    }
+
+    if (isStartMessage) {
+      console.log(`[buildPromptByTemplate] 识别为开场语，添加开场指令`);
+      return `【系统强制指令 - 最高优先级】
+你当前正在处理实验设计助手请求。用户输入了开场语，你必须立即进入第一步：触发启动。
+
+【用户输入】：
+${content}
+
+【你必须执行的操作】：
+输出以下欢迎语，一字不差：
+
+---
+👋 您好！我是您的**门店演示实验设计专家**。
+
+我将帮您设计专属的产品现场演示实验，让您的产品在会场、门店、活动现场震撼呈现，瞬间激发顾客购买冲动！
+
+**请先提供您的产品信息**（填写越详细，实验设计越精准）：
+
+---
+📋 **产品信息表**
+
+- 【产品名称】：
+- 【产品成分】：（请注明关键成分及添加量，越详细越好）
+- 【产品功效】：
+- 【产品理论基础】：（您的产品解决了什么核心问题？通过什么机制起效？）
+- 【实验要求】：（可选。如：演示场地、时间限制、特殊要求等）
+---
+
+💡 **填写示例**：
+
+- 产品名称：西洋参乳清蛋白肽
+- 产品成分：浓缩乳清蛋白粉、乳清蛋白肽（2%）、西洋参提取物（1%）、D-核糖（10%）、牛磺酸等
+- 产品功效：增强免疫力、缓解体力疲劳
+- 产品理论基础：细胞能量枯竭、ATP不足是免疫力失衡的根本原因，本产品通过给细胞快速补充能量，激活细胞，重建免疫
+- 实验要求：小型会场演示，100人以内，实验时间5分钟内，现象要震撼直观
+
+---
+> ✍️ 请按上方格式填写您的产品信息，提交后我们进入下一步！
+
+【注意】：回复完欢迎语后，等待用户输入，不要继续输出任何内容。`;
+    }
+
+    console.log(`[buildPromptByTemplate] 未识别为特定类型，添加补充指令`);
+    return `【系统强制指令 - 最高优先级】
+你当前正在处理实验设计助手请求。
+
+【用户输入】：
+${content}
+
+【你必须执行的操作】：
+1. 首先检查用户输入是否包含产品信息（产品名称、成分、功效、理论基础、实验要求等）
+2. 如果包含产品信息：立即进入第二步：接收产品信息，输出信息确认卡
+3. 如果不包含产品信息：输出第一步的欢迎语，引导用户填写产品信息表
+4. 禁止重复索要已经提供的信息
+
+【判断标准】：
+- 如果用户输入中包含“产品名称”、“成分”、“功效”等关键词，或者有明显的产品描述
+- 如果用户输入格式类似示例格式（使用冒号、破折号、方括号等分隔）
+- 如果用户输入长度超过30个字符且包含产品相关信息
+
+请根据以上指令立即执行相应操作。`;
   }
 
   return renderTemplate(template, {

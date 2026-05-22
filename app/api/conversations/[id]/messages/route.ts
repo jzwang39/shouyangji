@@ -303,6 +303,11 @@ ${content}`;
       const isMaterialTaggingConversation =
         normalizedConversationSlug === "material-tagging-assistant" ||
         String(conversation.agent_name ?? "").includes("素材标记");
+      
+      console.log(`[API] isMaterialTaggingConversation: ${isMaterialTaggingConversation}`);
+      console.log(`[API] isMaterialCaptureConversation: ${isMaterialCaptureConversation}`);
+      console.log(`[API] followupResultContext: ${followupResultContext ? '有值' : '空'}`);
+      
       const promptContent =
         (isMaterialTaggingConversation ||
           isMaterialCaptureConversation) &&
@@ -313,6 +318,10 @@ ${followupResultContext}
 以下是用户本次的新请求：
 ${content}`
           : content;
+      
+      console.log(`[API] promptContent长度: ${promptContent.length}`);
+      console.log(`[API] promptOverride: ${promptOverride ? '有值，长度=' + promptOverride.length : '空'}`);
+      
       let prompt =
         promptOverride || (await buildPromptForAgent(conversation.slug, promptContent));
       let aiMessages:
