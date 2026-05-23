@@ -887,7 +887,7 @@ ${lastkegang || "（当前为第一节课程，无上一节课大纲）"}
 3. 扩写的内容中如果遇到案例、数据，要保证真实有效，有出处，不能编造。
 4. 结果控制在8000个字左右。
 
-【极其重要的强制指令】：
+【本次写作重点】：
 通过大纲识别，当前你正在撰写的是【${currentLessonTitle || currentLessonLabel}】的逐字稿！
 你的输出标题必须以此开头，绝对不允许从第1节开始写！禁止出现“第一节”、“第1节”等无关字眼（除非当前真的是第1节），严格围绕【${currentLessonLabel}】展开！必须打破从头开始写的惯性！`;
 }
@@ -1725,10 +1725,10 @@ function buildPromptByTemplate(slug: string, template: string, content: string) 
       description: content
     });
     
-    // 在基础 Prompt 后添加强指令
+    // 在基础 Prompt 后添加明确的节次约束
     return `${basePrompt}
 
-【极其重要的强制指令】：
+【本次写作重点】：
 通过大纲识别，当前你正在撰写的是【${currentLessonTitle || currentLessonLabel}】的逐字稿！
 你的输出标题必须以此开头，绝对不允许从第1节开始写！禁止出现“第一节”、“第1节”等无关字眼（除非当前真的是第1节），严格围绕【${currentLessonLabel}】展开！必须打破从头开始写的惯性！`;
   }
@@ -1744,14 +1744,14 @@ function buildPromptByTemplate(slug: string, template: string, content: string) 
     console.log(`[buildPromptByTemplate] looksLikeProductInfo: ${looksLikeProductInfo}`);
     
     if (looksLikeProductInfo) {
-      console.log(`[buildPromptByTemplate] 识别为产品信息输入，添加强制指令`);
-      return `【系统强制指令 - 最高优先级】
-你当前正在处理实验设计助手请求。用户已经提供了产品信息，你必须立即进入第二步：接收产品信息。
+      console.log(`[buildPromptByTemplate] 识别为产品信息输入，添加处理说明`);
+      return `【任务说明】：
+你当前正在处理实验设计助手请求。用户已经提供了产品信息，请直接进入“接收产品信息”这一步。
 
 【用户输入的产品信息】：
 ${content}
 
-【你必须执行的操作】：
+【处理要求】：
 1. 立即提取并整理用户提供的所有产品信息
 2. 如果“产品名称、产品成分、产品功效”三项齐全：直接输出“信息确认卡”，然后询问实验方向
 3. 如果三项中有缺失：只追问缺失项，不要重复输出整个产品信息表
@@ -1783,14 +1783,14 @@ ${content}
     }
 
     if (isStartMessage) {
-      console.log(`[buildPromptByTemplate] 识别为开场语，添加开场指令`);
-      return `【系统强制指令 - 最高优先级】
-你当前正在处理实验设计助手请求。用户输入了开场语，你必须立即进入第一步：触发启动。
+      console.log(`[buildPromptByTemplate] 识别为开场语，添加开场说明`);
+      return `【任务说明】：
+你当前正在处理实验设计助手请求。用户输入了开场语，请直接进入第一步并给出欢迎语。
 
 【用户输入】：
 ${content}
 
-【你必须执行的操作】：
+【处理要求】：
 输出以下欢迎语，一字不差：
 
 ---
@@ -1824,14 +1824,14 @@ ${content}
 【注意】：回复完欢迎语后，等待用户输入，不要继续输出任何内容。`;
     }
 
-    console.log(`[buildPromptByTemplate] 未识别为特定类型，添加补充指令`);
-    return `【系统强制指令 - 最高优先级】
+    console.log(`[buildPromptByTemplate] 未识别为特定类型，添加补充说明`);
+    return `【任务说明】：
 你当前正在处理实验设计助手请求。
 
 【用户输入】：
 ${content}
 
-【你必须执行的操作】：
+【处理要求】：
 1. 首先检查用户输入是否包含产品信息（产品名称、成分、功效、理论基础、实验要求等）
 2. 如果包含产品信息：立即进入第二步：接收产品信息，输出信息确认卡
 3. 如果不包含产品信息：输出第一步的欢迎语，引导用户填写产品信息表
