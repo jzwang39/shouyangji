@@ -21,6 +21,8 @@ export async function GET(request: Request) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
   const userId = Number((session.user as any).id);
+  const userRole = String((session.user as any).role ?? "");
+  const isSuperAdmin = userRole === "super_admin";
   const url = new URL(request.url);
   const productName = url.searchParams.get("productName");
   const agentName = url.searchParams.get("agentName");
@@ -73,9 +75,14 @@ export async function GET(request: Request) {
       updatedAt: row.updated_at
     });
   }
-  const rows = await query<{ product_name: string }>(
-    "SELECT DISTINCT product_name FROM agent_results ORDER BY product_name ASC"
-  );
+  const rows = isSuperAdmin
+    ? await query<{ product_name: string }>(
+        "SELECT DISTINCT product_name FROM agent_results ORDER BY product_name ASC"
+      )
+    : await query<{ product_name: string }>(
+        "SELECT DISTINCT product_name FROM agent_results WHERE operator_user_id = ? ORDER BY product_name ASC",
+        [userId]
+      );
   const names = rows
     .map((row) => row.product_name)
     .filter((name) => !!name);
