@@ -41,11 +41,33 @@ type CourseRuleRow = {
   rule_content: string;
 };
 
+type ActivePanel = "chat" | "data-management";
+
+type ManagedResultRow = {
+  id: number;
+  productName: string;
+  agentName: string;
+  lessonCount: number;
+  operatorUserId: number;
+  operatorName: string;
+  resultContent: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type Props = {
   user: UserInfo;
   agents: Agent[];
   initialConversations: Conversation[];
 };
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
 
 function AgentMenuIcon({ slug }: { slug: string }) {
   const className = "h-4 w-4 shrink-0 opacity-80";
@@ -839,6 +861,7 @@ export default function ChatApp(props: Props) {
 
   const [conversations, setConversations] =
     useState<Conversation[]>(initialConversations);
+  const [activePanel, setActivePanel] = useState<ActivePanel>("chat");
   const [currentConversationId, setCurrentConversationId] = useState<
     number | null
   >(conversations[0]?.id ?? null);
@@ -895,6 +918,18 @@ export default function ChatApp(props: Props) {
   >(null);
   const [referencedContextByConversation, setReferencedContextByConversation] =
     useState<Record<number, string>>({});
+  const [dataManagementFilters, setDataManagementFilters] = useState({
+    productName: "",
+    operatorName: "",
+    agentName: ""
+  });
+  const [managedResults, setManagedResults] = useState<ManagedResultRow[]>([]);
+  const [loadingManagedResults, setLoadingManagedResults] = useState(false);
+  const [editingManagedResult, setEditingManagedResult] =
+    useState<ManagedResultRow | null>(null);
+  const [editingManagedResultContent, setEditingManagedResultContent] =
+    useState("");
+  const [savingManagedResult, setSavingManagedResult] = useState(false);
   const currentConversationIdRef = useRef<number | null>(null);
 
   const getErrorMessage = useCallback((e: any, fallback: string) => {
@@ -938,6 +973,42 @@ export default function ChatApp(props: Props) {
   const currentAgent = useMemo(
     () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
     [agents, selectedAgentId]
+  );
+
+  const isAdminViewer = user.role === "admin" || user.role === "super_admin";
+
+  const loadManagedResults = useCallback(
+    async (filters: {
+      productName: string;
+      operatorName: string;
+      agentName: string;
+    }) => {
+      setLoadingManagedResults(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        const productName = filters.productName.trim();
+        const operatorName = filters.operatorName.trim();
+        const agentName = filters.agentName.trim();
+        if (productName) params.set("productName", productName);
+        if (operatorName) params.set("operatorName", operatorName);
+        if (agentName) params.set("agentName", agentName);
+        const queryString = params.toString();
+        const res = await fetch(
+          `/api/results/manage${queryString ? `?${queryString}` : ""}`
+        );
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+        const data: ManagedResultRow[] = await res.json();
+        setManagedResults(Array.isArray(data) ? data : []);
+      } catch (e: any) {
+        setError(getErrorMessage(e, "加载结果数据失败"));
+      } finally {
+        setLoadingManagedResults(false);
+      }
+    },
+    [getErrorMessage]
   );
 
   const courseTranscriptLessonOptions = useMemo(() => {
@@ -1386,6 +1457,7 @@ export default function ChatApp(props: Props) {
   const handleSelectConversation = (conversationId: number) => {
     if (conversationId === currentConversationId) return;
     void cleanupCurrentConversationIfEmpty();
+    setActivePanel("chat");
     setCurrentConversationId(conversationId);
     setMessages([]);
     setMobileSidebarOpen(false);
@@ -1394,6 +1466,7 @@ export default function ChatApp(props: Props) {
   const handleNewConversation = () => {
     if (!selectedAgentId) return;
     void cleanupCurrentConversationIfEmpty();
+    setActivePanel("chat");
     setCurrentAgentId(selectedAgentId);
     setCurrentConversationId(VIRTUAL_CONVERSATION_ID);
     setMessages([]);
@@ -1402,6 +1475,7 @@ export default function ChatApp(props: Props) {
   };
 
   const handleSelectAgent = (agentId: number) => {
+    setActivePanel("chat");
     setCurrentAgentId(agentId);
     if (!currentConversationId) {
       return;
@@ -1423,6 +1497,66 @@ export default function ChatApp(props: Props) {
     setMessages([]);
     setCurrentInput("");
   };
+
+  const handleOpenDataManagement = useCallback(() => {
+    void cleanupCurrentConversationIfEmpty();
+    setActivePanel("data-management");
+    setMobileSidebarOpen(false);
+    void loadManagedResults(dataManagementFilters);
+  }, [cleanupCurrentConversationIfEmpty, dataManagementFilters, loadManagedResults]);
+
+  const handleSearchManagedResults = useCallback(() => {
+    void loadManagedResults(dataManagementFilters);
+  }, [dataManagementFilters, loadManagedResults]);
+
+  const handleResetManagedResults = useCallback(() => {
+    const nextFilters = {
+      productName: "",
+      operatorName: "",
+      agentName: ""
+    };
+    setDataManagementFilters(nextFilters);
+    void loadManagedResults(nextFilters);
+  }, [loadManagedResults]);
+
+  const handleOpenManagedResultEdit = useCallback((row: ManagedResultRow) => {
+    setEditingManagedResult(row);
+    setEditingManagedResultContent(row.resultContent);
+  }, []);
+
+  const handleSaveManagedResultEdit = useCallback(async () => {
+    if (!editingManagedResult) return;
+    const resultContent = editingManagedResultContent.trim();
+    if (!resultContent) {
+      setError("结果内容不能为空");
+      return;
+    }
+    setSavingManagedResult(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/results/manage", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingManagedResult.id,
+          resultContent
+        })
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      const data: ManagedResultRow = await res.json();
+      setManagedResults((prev) =>
+        prev.map((item) => (item.id === data.id ? data : item))
+      );
+      setEditingManagedResult(null);
+      setEditingManagedResultContent("");
+    } catch (e: any) {
+      setError(getErrorMessage(e, "更新结果内容失败"));
+    } finally {
+      setSavingManagedResult(false);
+    }
+  }, [editingManagedResult, editingManagedResultContent, getErrorMessage]);
 
   const pollConversationMessages = useCallback(
     async (conversationId: number, assistantMessageId: number) => {
@@ -2290,7 +2424,7 @@ export default function ChatApp(props: Props) {
                     type="button"
                     disabled={sending}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
-                      selectedAgentId === agent.id
+                      activePanel === "chat" && selectedAgentId === agent.id
                         ? "bg-sidebar-active font-medium"
                         : "hover:bg-sidebar-hover"
                     }`}
@@ -2302,6 +2436,35 @@ export default function ChatApp(props: Props) {
                     </span>
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className={`flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
+                    activePanel === "data-management"
+                      ? "bg-sidebar-active font-medium"
+                      : "hover:bg-sidebar-hover"
+                  }`}
+                  onClick={handleOpenDataManagement}
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <svg
+                      className="h-4 w-4 shrink-0 opacity-80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 5h16" />
+                      <path d="M4 12h16" />
+                      <path d="M4 19h16" />
+                      <path d="M8 3v4" />
+                      <path d="M16 10v4" />
+                      <path d="M12 17v4" />
+                    </svg>
+                    <span className="truncate">数据管理</span>
+                  </span>
+                </button>
               </div>
             </div>
             <div className="mt-8 px-5 pb-4">
@@ -2321,7 +2484,7 @@ export default function ChatApp(props: Props) {
                     key={conversation.id}
                     type="button"
                     className={`w-full rounded-lg px-3 py-2.5 text-left text-xs transition-all duration-200 group ${
-                      currentConversationId === conversation.id
+                      activePanel === "chat" && currentConversationId === conversation.id
                         ? "bg-sidebar-active"
                         : "hover:bg-sidebar-hover"
                     }`}
@@ -2471,7 +2634,9 @@ export default function ChatApp(props: Props) {
             菜单
           </button>
           <div className="text-sm font-semibold">
-            {currentConversation?.title || "AI 对话"}
+            {activePanel === "data-management"
+              ? "数据管理"
+              : currentConversation?.title || "AI 对话"}
           </div>
           {(user.role === "admin" || user.role === "super_admin") && (
             <button
@@ -2497,7 +2662,7 @@ export default function ChatApp(props: Props) {
                   type="button"
                   disabled={sending}
                   className={`rounded px-2 py-1 text-xs transition-colors ${
-                    selectedAgentId === agent.id
+                    activePanel === "chat" && selectedAgentId === agent.id
                       ? "bg-sidebar-active"
                       : "bg-sidebar-hover"
                   }`}
@@ -2509,6 +2674,35 @@ export default function ChatApp(props: Props) {
                   </span>
                 </button>
               ))}
+              <button
+                type="button"
+                className={`rounded px-2 py-1 text-xs transition-colors ${
+                  activePanel === "data-management"
+                    ? "bg-sidebar-active"
+                    : "bg-sidebar-hover"
+                }`}
+                onClick={handleOpenDataManagement}
+              >
+                <span className="flex items-center gap-1.5">
+                  <svg
+                    className="h-4 w-4 shrink-0 opacity-80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4 5h16" />
+                    <path d="M4 12h16" />
+                    <path d="M4 19h16" />
+                    <path d="M8 3v4" />
+                    <path d="M16 10v4" />
+                    <path d="M12 17v4" />
+                  </svg>
+                  <span className="truncate">数据管理</span>
+                </span>
+              </button>
             </div>
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs opacity-60">对话</span>
@@ -2526,7 +2720,7 @@ export default function ChatApp(props: Props) {
                   key={conversation.id}
                   type="button"
                   className={`w-full rounded px-2 py-2 text-left text-xs transition-colors ${
-                    currentConversationId === conversation.id
+                    activePanel === "chat" && currentConversationId === conversation.id
                       ? "bg-sidebar-active"
                       : "bg-sidebar-hover"
                   }`}
@@ -2619,261 +2813,437 @@ export default function ChatApp(props: Props) {
           <div className="flex items-center justify-between rounded-bl-[28px] border-b border-[#ded7cc] bg-[#faf8f4] px-6 py-3">
             <div className="flex flex-col">
               <div className="text-base font-semibold text-sidebar-text">
-                {currentConversation?.title || "开始新的对话"}
+                {activePanel === "data-management"
+                  ? "数据管理"
+                  : currentConversation?.title || "开始新的对话"}
               </div>
-              {currentAgent ? (
+              {activePanel === "data-management" ? (
+                <div className="mt-0.5 text-xs text-sidebar-text opacity-50">
+                  {isAdminViewer
+                    ? "当前为管理员视角，可查看全部已保存结果数据"
+                    : "当前仅显示您自己保存的结果数据"}
+                </div>
+              ) : currentAgent ? (
                 <div className="mt-0.5 text-xs text-sidebar-text opacity-50">
                   当前智能体：{currentAgent.name}
                 </div>
               ) : null}
             </div>
             <div className="flex items-center gap-2 text-xs">
-              {(user.role === "admin" || user.role === "super_admin") ? (
-                <label className="flex items-center gap-1.5 text-sidebar-text opacity-60 cursor-pointer hover:opacity-100 transition-opacity">
-                  <input
-                    type="checkbox"
-                    className="h-3 w-3"
-                    checked={devMode}
-                    onChange={(event) => setDevMode(event.target.checked)}
-                  />
-                  <span>开发者模式</span>
-                </label>
-              ) : null}
-              <button
-                type="button"
-                className="rounded-lg border border-sidebar-active px-3 py-1.5 text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar-active transition-all disabled:opacity-30"
-                onClick={handleClearConversation}
-                disabled={!currentConversationId}
-              >
-                清除当前会话
-              </button>
-              <button
-                type="button"
-                className="rounded-lg border border-sidebar-active px-3 py-1.5 text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar-active transition-all disabled:opacity-30"
-                onClick={handleExportConversation}
-                disabled={!currentConversationId || messages.length === 0}
-              >
-                导出
-              </button>
+              {activePanel === "data-management" ? (
+                <button
+                  type="button"
+                  className="rounded-lg border border-sidebar-active px-3 py-1.5 text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar-active transition-all"
+                  onClick={handleSearchManagedResults}
+                  disabled={loadingManagedResults}
+                >
+                  {loadingManagedResults ? "加载中..." : "刷新列表"}
+                </button>
+              ) : (
+                <>
+                  {(user.role === "admin" || user.role === "super_admin") ? (
+                    <label className="flex items-center gap-1.5 text-sidebar-text opacity-60 cursor-pointer hover:opacity-100 transition-opacity">
+                      <input
+                        type="checkbox"
+                        className="h-3 w-3"
+                        checked={devMode}
+                        onChange={(event) => setDevMode(event.target.checked)}
+                      />
+                      <span>开发者模式</span>
+                    </label>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="rounded-lg border border-sidebar-active px-3 py-1.5 text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar-active transition-all disabled:opacity-30"
+                    onClick={handleClearConversation}
+                    disabled={!currentConversationId}
+                  >
+                    清除当前会话
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-sidebar-active px-3 py-1.5 text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar-active transition-all disabled:opacity-30"
+                    onClick={handleExportConversation}
+                    disabled={!currentConversationId || messages.length === 0}
+                  >
+                    导出
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-scroll rounded-tl-[28px] px-6 py-6 custom-scrollbar bg-[#f3efe9]">
-            <div className="mx-auto w-full max-w-4xl">
-            {error ? (
-              <div className="mb-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-xs text-red-600">
-                {error}
-                <button
-                  type="button"
-                  className="ml-2 underline"
-                  onClick={() => setMessagesReloadKey((prev) => prev + 1)}
-                >
-                  重试
-                </button>
-              </div>
-            ) : null}
-            {generatingConversationId === currentConversationId ? (
-              <div className="mb-4 rounded-xl bg-sky-50 border border-sky-100 px-4 py-3 text-xs text-sky-700">
-                任务已提交，正在生成结果，请稍候...
-              </div>
-            ) : null}
-
-            {loadingMessages ? (
-              <div className="text-xs text-slate-400">加载中...</div>
-            ) : null}
-
-            {!loadingMessages && messages.length === 0 ? (
-              <div className="mt-12 text-center text-sm text-slate-400">
-                {currentAgent?.slug === "product-one-pager"
-                  ? '我是一位大健康产品策划顾问，专门帮助产品团队梳理"产品基本信息一页纸"，可以输入：开始'
-                  : "还没有消息，输入内容开始对话"}
-              </div>
-            ) : null}
-
-            <div className="space-y-4">
-              {messages.map((message) => {
-                const prompt =
-                  message.role === "assistant" ? aiPrompts[message.id] : null;
-                const showPromptToggle = devMode && !!prompt;
-                const displayedContent =
-                  message.role === "assistant" &&
-                  typeof message.content === "string"
-                    ? stripPendingPrefix(message.content)
-                    : message.content;
-                return (
-                  <div
-                    key={message.id}
-                    className={`flex w-full ${
-                      message.role === "user"
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    <div className={`space-y-1 ${message.role === "user" ? "max-w-[75%]" : "w-full"}`}>
-                      <div
-                        ref={(node) => {
-                          if (message.id === lastAssistantId) {
-                            lastAssistantContentRef.current = node;
-                          }
-                        }}
-                        className={`max-h-[70vh] overflow-y-scroll text-sm custom-scrollbar ${
-                          message.role === "user"
-                            ? "px-4 py-3 rounded-[28px] bg-sidebar-active text-sidebar-text"
-                            : "w-full px-5 py-4 rounded-[28px] bg-white shadow-sm border border-black/5 text-slate-800"
-                        }`}
-                      >
-                        {message.role === "assistant" && (
-                          <div className="mb-2 flex items-center justify-end gap-3 text-[11px] text-slate-400">
-                            {(currentAgent?.slug === "nine-grid" ||
-                              currentAgent?.slug === "positioning-helper" ||
-                              currentAgent?.slug === "four-things" ||
-                              currentAgent?.slug === "product-one-pager" ||
-                              currentAgent?.slug === "course-outline" ||
-                              currentAgent?.slug === "material-tagging-assistant") ? (
-                              <button
-                                type="button"
-                                className="hover:text-slate-700 transition-colors"
-                                onClick={() => handleOpenSaveResult(message)}
-                              >
-                                保存
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              className="hover:text-slate-700 transition-colors"
-                              onClick={() => handleCopy(message)}
-                            >
-                              点击复制内容
-                            </button>
-                            {message.id === lastAssistantId ? (
-                              <button
-                                type="button"
-                                className="hover:text-slate-700 transition-colors"
-                                onClick={() => handleCopyVisibleResult(message)}
-                              >
-                                结果拷贝
-                              </button>
-                            ) : null}
-                          </div>
-                        )}
-                        <div
-                          data-copy-result-id={
-                            message.role === "assistant" ? String(message.id) : undefined
-                          }
-                          className={`prose prose-sm max-w-none prose-headings:font-bold prose-p:leading-relaxed prose-p:my-3 prose-h1:text-xl prose-h2:text-lg prose-h3:text-base ${
-                            message.role === "user"
-                              ? "prose-headings:text-sidebar-text prose-p:text-sidebar-text text-sidebar-text"
-                              : "prose-headings:text-slate-800 prose-li:marker:text-slate-400 text-slate-700"
-                          }`}
-                        >
-                          <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
-                            {displayedContent}
-                          </ReactMarkdown>
-                        </div>
-                      </div>
-                      {showPromptToggle ? (
-                        <details className="w-full">
-                          <summary className="cursor-pointer text-[11px] text-slate-500 underline">
-                            查看本次 prompt
-                          </summary>
-                          <pre className="mt-1 max-h-60 overflow-y-scroll rounded bg-slate-900 p-2 text-[11px] text-slate-100 custom-scrollbar">
-                            {prompt}
-                          </pre>
-                        </details>
-                      ) : null}
+          {activePanel === "data-management" ? (
+            <div className="min-h-0 flex-1 overflow-y-scroll rounded-tl-[28px] px-6 py-6 custom-scrollbar bg-[#f3efe9]">
+              <div className="mx-auto w-full max-w-6xl space-y-4">
+                {error ? (
+                  <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-600">
+                    {error}
+                  </div>
+                ) : null}
+                <div className="rounded-[28px] border border-black/5 bg-white p-5 shadow-sm">
+                  <div className="mb-4 text-sm font-semibold text-slate-800">
+                    搜索条件
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-[11px] text-slate-500">
+                        产品名称
+                      </label>
+                      <input
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
+                        value={dataManagementFilters.productName}
+                        onChange={(event) =>
+                          setDataManagementFilters((prev) => ({
+                            ...prev,
+                            productName: event.target.value
+                          }))
+                        }
+                        placeholder="请输入产品名称"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] text-slate-500">
+                        操作人
+                      </label>
+                      <input
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
+                        value={dataManagementFilters.operatorName}
+                        onChange={(event) =>
+                          setDataManagementFilters((prev) => ({
+                            ...prev,
+                            operatorName: event.target.value
+                          }))
+                        }
+                        placeholder="请输入操作人"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] text-slate-500">
+                        智能体名称
+                      </label>
+                      <input
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
+                        value={dataManagementFilters.agentName}
+                        onChange={(event) =>
+                          setDataManagementFilters((prev) => ({
+                            ...prev,
+                            agentName: event.target.value
+                          }))
+                        }
+                        placeholder="请输入智能体名称"
+                      />
                     </div>
                   </div>
-                );
-              })}
-              <div ref={bottomAnchorRef} />
+                  <div className="mt-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50"
+                      onClick={handleResetManagedResults}
+                      disabled={loadingManagedResults}
+                    >
+                      重置
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-all hover:opacity-90 disabled:opacity-40"
+                      onClick={handleSearchManagedResults}
+                      disabled={loadingManagedResults}
+                    >
+                      {loadingManagedResults ? "查询中..." : "搜索"}
+                    </button>
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                    <div className="text-sm font-semibold text-slate-800">
+                      已保存结果数据
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {loadingManagedResults
+                        ? "正在加载..."
+                        : `共 ${managedResults.length} 条`}
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm text-slate-700">
+                      <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">产品名称</th>
+                          <th className="px-4 py-3 font-medium">智能体名称</th>
+                          <th className="px-4 py-3 font-medium">课程节数</th>
+                          <th className="px-4 py-3 font-medium">操作人</th>
+                          <th className="px-4 py-3 font-medium">创建时间</th>
+                          <th className="px-4 py-3 font-medium">修改时间</th>
+                          <th className="px-4 py-3 font-medium">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {managedResults.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={7}
+                              className="px-4 py-10 text-center text-sm text-slate-400"
+                            >
+                              {loadingManagedResults
+                                ? "结果数据加载中..."
+                                : "暂无符合条件的数据"}
+                            </td>
+                          </tr>
+                        ) : (
+                          managedResults.map((row) => (
+                            <tr
+                              key={row.id}
+                              className="border-t border-slate-100 align-top"
+                            >
+                              <td className="px-4 py-3">{row.productName}</td>
+                              <td className="px-4 py-3">{row.agentName}</td>
+                              <td className="px-4 py-3">{row.lessonCount}</td>
+                              <td className="px-4 py-3">{row.operatorName}</td>
+                              <td className="px-4 py-3">
+                                {formatDateTime(row.createdAt)}
+                              </td>
+                              <td className="px-4 py-3">
+                                {formatDateTime(row.updatedAt)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <button
+                                  type="button"
+                                  className="rounded-lg border border-sidebar-active px-3 py-1.5 text-xs text-sidebar-text transition-all hover:bg-sidebar-active"
+                                  onClick={() => handleOpenManagedResultEdit(row)}
+                                >
+                                  修改
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="min-h-0 flex-1 overflow-y-scroll rounded-tl-[28px] px-6 py-6 custom-scrollbar bg-[#f3efe9]">
+                <div className="mx-auto w-full max-w-4xl">
+                {error ? (
+                  <div className="mb-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-xs text-red-600">
+                    {error}
+                    <button
+                      type="button"
+                      className="ml-2 underline"
+                      onClick={() => setMessagesReloadKey((prev) => prev + 1)}
+                    >
+                      重试
+                    </button>
+                  </div>
+                ) : null}
+                {generatingConversationId === currentConversationId ? (
+                  <div className="mb-4 rounded-xl bg-sky-50 border border-sky-100 px-4 py-3 text-xs text-sky-700">
+                    任务已提交，正在生成结果，请稍候...
+                  </div>
+                ) : null}
 
-          <div className="border-t border-[#e7dfd5] rounded-tl-[36px] rounded-tr-[36px] bg-[#f8f5f1] px-6 py-4">
-            <div className="mx-auto w-full max-w-4xl">
-            <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-wider text-sidebar-text opacity-40">
-              <span>Enter 发送，Shift+Enter 换行</span>
-              <div className="flex items-center gap-3">
-                {sending ? <span>发送中...</span> : null}
-                {!sending && generatingConversationId === currentConversationId ? (
-                  <span>已提交，生成中...</span>
+                {loadingMessages ? (
+                  <div className="text-xs text-slate-400">加载中...</div>
                 ) : null}
-                {(isPositioningAgent(currentAgent) ||
-                  isFourThingsAgent(currentAgent) ||
-                  isNineGridAgent(currentAgent) ||
-                  isCourseOutlineAgent(currentAgent) ||
-                  isCourseTranscriptAgent(currentAgent) ||
-                  isAnyMaterialCaptureAgent(currentAgent)) ? (
-                  <button
-                    type="button"
-                    className="underline normal-case text-[11px] opacity-100"
-                    onClick={handleOpenReferenceData}
-                  >
-                    引用数据
-                  </button>
+
+                {!loadingMessages && messages.length === 0 ? (
+                  <div className="mt-12 text-center text-sm text-slate-400">
+                    {currentAgent?.slug === "product-one-pager"
+                      ? '我是一位大健康产品策划顾问，专门帮助产品团队梳理"产品基本信息一页纸"，可以输入：开始'
+                      : "还没有消息，输入内容开始对话"}
+                  </div>
                 ) : null}
+
+                <div className="space-y-4">
+                  {messages.map((message) => {
+                    const prompt =
+                      message.role === "assistant" ? aiPrompts[message.id] : null;
+                    const showPromptToggle = devMode && !!prompt;
+                    const displayedContent =
+                      message.role === "assistant" &&
+                      typeof message.content === "string"
+                        ? stripPendingPrefix(message.content)
+                        : message.content;
+                    return (
+                      <div
+                        key={message.id}
+                        className={`flex w-full ${
+                          message.role === "user"
+                            ? "justify-end"
+                            : "justify-start"
+                        }`}
+                      >
+                        <div className={`space-y-1 ${message.role === "user" ? "max-w-[75%]" : "w-full"}`}>
+                          <div
+                            ref={(node) => {
+                              if (message.id === lastAssistantId) {
+                                lastAssistantContentRef.current = node;
+                              }
+                            }}
+                            className={`max-h-[70vh] overflow-y-scroll text-sm custom-scrollbar ${
+                              message.role === "user"
+                                ? "px-4 py-3 rounded-[28px] bg-sidebar-active text-sidebar-text"
+                                : "w-full px-5 py-4 rounded-[28px] bg-white shadow-sm border border-black/5 text-slate-800"
+                            }`}
+                          >
+                            {message.role === "assistant" && (
+                              <div className="mb-2 flex items-center justify-end gap-3 text-[11px] text-slate-400">
+                                {(currentAgent?.slug === "nine-grid" ||
+                                  currentAgent?.slug === "positioning-helper" ||
+                                  currentAgent?.slug === "four-things" ||
+                                  currentAgent?.slug === "product-one-pager" ||
+                                  currentAgent?.slug === "course-outline" ||
+                                  currentAgent?.slug === "material-tagging-assistant") ? (
+                                  <button
+                                    type="button"
+                                    className="hover:text-slate-700 transition-colors"
+                                    onClick={() => handleOpenSaveResult(message)}
+                                  >
+                                    保存
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="hover:text-slate-700 transition-colors"
+                                  onClick={() => handleCopy(message)}
+                                >
+                                  点击复制内容
+                                </button>
+                                {message.id === lastAssistantId ? (
+                                  <button
+                                    type="button"
+                                    className="hover:text-slate-700 transition-colors"
+                                    onClick={() => handleCopyVisibleResult(message)}
+                                  >
+                                    结果拷贝
+                                  </button>
+                                ) : null}
+                              </div>
+                            )}
+                            <div
+                              data-copy-result-id={
+                                message.role === "assistant" ? String(message.id) : undefined
+                              }
+                              className={`prose prose-sm max-w-none prose-headings:font-bold prose-p:leading-relaxed prose-p:my-3 prose-h1:text-xl prose-h2:text-lg prose-h3:text-base ${
+                                message.role === "user"
+                                  ? "prose-headings:text-sidebar-text prose-p:text-sidebar-text text-sidebar-text"
+                                  : "prose-headings:text-slate-800 prose-li:marker:text-slate-400 text-slate-700"
+                              }`}
+                            >
+                              <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
+                                {displayedContent}
+                              </ReactMarkdown>
+                            </div>
+                          </div>
+                          {showPromptToggle ? (
+                            <details className="w-full">
+                              <summary className="cursor-pointer text-[11px] text-slate-500 underline">
+                                查看本次 prompt
+                              </summary>
+                              <pre className="mt-1 max-h-60 overflow-y-scroll rounded bg-slate-900 p-2 text-[11px] text-slate-100 custom-scrollbar">
+                                {prompt}
+                              </pre>
+                            </details>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div ref={bottomAnchorRef} />
+                </div>
+                </div>
               </div>
-            </div>
-            <textarea
-              ref={messageInputRef}
-              className="w-full min-h-24 rounded-2xl border border-sidebar-active/60 bg-white px-4 py-3 text-sm text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30 custom-scrollbar placeholder:text-sidebar-text/30"
-              placeholder="您可以输入您的需求，让AI为您生成..."
-              value={currentInput}
-              disabled={sending}
-              onChange={(event) => {
-                const value = event.target.value;
-                setCurrentInput(value);
-                resizeMessageInput();
-                if (currentConversationId) {
-                  saveDraft(currentConversationId, value);
-                }
-              }}
-              onKeyDown={handleKeyDown}
-            />
-            <div className="mt-3 flex items-center justify-between">
-              <div className="text-xs text-slate-400">
-                {sending
-                  ? "正在发送..."
-                  : generatingConversationId === currentConversationId
-                    ? "已提交，正在生成回复..."
-                    : ""}
-              </div>
-              <div className="flex items-center gap-2">
-                {sending ? (
-                  <button
-                    type="button"
-                    className="rounded-xl border border-slate-200 px-4 py-2 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
-                    onClick={() => setSending(false)}
-                  >
-                    停止生成
-                  </button>
+
+              <div className="border-t border-[#e7dfd5] rounded-tl-[36px] rounded-tr-[36px] bg-[#f8f5f1] px-6 py-4">
+                <div className="mx-auto w-full max-w-4xl">
+                <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-wider text-sidebar-text opacity-40">
+                  <span>Enter 发送，Shift+Enter 换行</span>
+                  <div className="flex items-center gap-3">
+                    {sending ? <span>发送中...</span> : null}
+                    {!sending && generatingConversationId === currentConversationId ? (
+                      <span>已提交，生成中...</span>
+                    ) : null}
+                    {(isPositioningAgent(currentAgent) ||
+                      isFourThingsAgent(currentAgent) ||
+                      isNineGridAgent(currentAgent) ||
+                      isCourseOutlineAgent(currentAgent) ||
+                      isCourseTranscriptAgent(currentAgent) ||
+                      isAnyMaterialCaptureAgent(currentAgent)) ? (
+                      <button
+                        type="button"
+                        className="underline normal-case text-[11px] opacity-100"
+                        onClick={handleOpenReferenceData}
+                      >
+                        引用数据
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+                <textarea
+                  ref={messageInputRef}
+                  className="w-full min-h-24 rounded-2xl border border-sidebar-active/60 bg-white px-4 py-3 text-sm text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30 custom-scrollbar placeholder:text-sidebar-text/30"
+                  placeholder="您可以输入您的需求，让AI为您生成..."
+                  value={currentInput}
+                  disabled={sending}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setCurrentInput(value);
+                    resizeMessageInput();
+                    if (currentConversationId) {
+                      saveDraft(currentConversationId, value);
+                    }
+                  }}
+                  onKeyDown={handleKeyDown}
+                />
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="text-xs text-slate-400">
+                    {sending
+                      ? "正在发送..."
+                      : generatingConversationId === currentConversationId
+                        ? "已提交，正在生成回复..."
+                        : ""}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {sending ? (
+                      <button
+                        type="button"
+                        className="rounded-xl border border-slate-200 px-4 py-2 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+                        onClick={() => setSending(false)}
+                      >
+                        停止生成
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="rounded-xl bg-primary px-6 py-2 text-sm font-medium text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={handleSend}
+                      disabled={
+                        sending ||
+                        generatingConversationId === currentConversationId ||
+                        !currentInput.trim()
+                      }
+                    >
+                      {sending
+                        ? "发送中..."
+                        : generatingConversationId === currentConversationId
+                          ? "生成中..."
+                          : "发送"}
+                    </button>
+                  </div>
+                </div>
+                {!currentConversationId ? (
+                  <div className="mt-2 text-xs text-slate-400">
+                    请选择智能体并输入内容开始新的对话
+                  </div>
                 ) : null}
-                <button
-                  type="button"
-                  className="rounded-xl bg-primary px-6 py-2 text-sm font-medium text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                  onClick={handleSend}
-                  disabled={
-                    sending ||
-                    generatingConversationId === currentConversationId ||
-                    !currentInput.trim()
-                  }
-                >
-                  {sending
-                    ? "发送中..."
-                    : generatingConversationId === currentConversationId
-                      ? "生成中..."
-                      : "发送"}
-                </button>
+                </div>
               </div>
-            </div>
-            {!currentConversationId ? (
-              <div className="mt-2 text-xs text-slate-400">
-                请选择智能体并输入内容开始新的对话
-              </div>
-            ) : null}
-            </div>
-          </div>
+            </>
+          )}
           {referenceDialogOpen && referenceForm ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="w-full max-w-lg max-h-[80vh] overflow-y-scroll rounded bg-white p-4 text-xs text-slate-900 custom-scrollbar">
@@ -3557,6 +3927,119 @@ export default function ChatApp(props: Props) {
                     disabled={savingResult}
                   >
                     {savingResult ? "保存中..." : "保存"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {editingManagedResult ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="w-full max-w-3xl max-h-[90vh] overflow-y-scroll rounded bg-white p-4 text-xs text-slate-900 custom-scrollbar">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-sm font-semibold">修改结果内容</div>
+                  <button
+                    type="button"
+                    className="text-[11px] text-slate-500 hover:text-slate-800"
+                    onClick={() => {
+                      setEditingManagedResult(null);
+                      setEditingManagedResultContent("");
+                    }}
+                  >
+                    关闭
+                  </button>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-[11px] text-slate-600">
+                      产品名称
+                    </label>
+                    <input
+                      className="w-full rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-600"
+                      value={editingManagedResult.productName}
+                      disabled
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-slate-600">
+                      智能体名称
+                    </label>
+                    <input
+                      className="w-full rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-600"
+                      value={editingManagedResult.agentName}
+                      disabled
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-slate-600">
+                      课程节数
+                    </label>
+                    <input
+                      className="w-full rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-600"
+                      value={String(editingManagedResult.lessonCount)}
+                      disabled
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-slate-600">
+                      操作人
+                    </label>
+                    <input
+                      className="w-full rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-600"
+                      value={editingManagedResult.operatorName}
+                      disabled
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-slate-600">
+                      创建时间
+                    </label>
+                    <input
+                      className="w-full rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-600"
+                      value={formatDateTime(editingManagedResult.createdAt)}
+                      disabled
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-slate-600">
+                      修改时间
+                    </label>
+                    <input
+                      className="w-full rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-600"
+                      value={formatDateTime(editingManagedResult.updatedAt)}
+                      disabled
+                    />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="mb-1 block text-[11px] text-slate-600">
+                    结果内容
+                  </label>
+                  <textarea
+                    className="h-80 w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    value={editingManagedResultContent}
+                    onChange={(event) =>
+                      setEditingManagedResultContent(event.target.value)
+                    }
+                  />
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded border px-3 py-1 text-xs"
+                    onClick={() => {
+                      setEditingManagedResult(null);
+                      setEditingManagedResultContent("");
+                    }}
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-300"
+                    onClick={handleSaveManagedResultEdit}
+                    disabled={savingManagedResult}
+                  >
+                    {savingManagedResult ? "保存中..." : "保存"}
                   </button>
                 </div>
               </div>
