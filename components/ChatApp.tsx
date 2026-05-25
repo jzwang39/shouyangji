@@ -830,6 +830,7 @@ export default function ChatApp(props: Props) {
   const lastAssistantContentRef = useRef<HTMLDivElement | null>(null);
   const lastAutoScrollConversationIdRef = useRef<number | null>(null);
   const activePollConversationIdRef = useRef<number | null>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -906,9 +907,23 @@ export default function ChatApp(props: Props) {
     return fallback;
   }, []);
 
+  const resizeMessageInput = useCallback(() => {
+    const textarea = messageInputRef.current;
+    if (!textarea) return;
+    const maxHeight = 320;
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, []);
+
   useEffect(() => {
     currentConversationIdRef.current = currentConversationId;
   }, [currentConversationId]);
+
+  useEffect(() => {
+    resizeMessageInput();
+  }, [currentInput, resizeMessageInput]);
 
   const currentConversation = useMemo(
     () => conversations.find((c) => c.id === currentConversationId) ?? null,
@@ -2801,13 +2816,15 @@ export default function ChatApp(props: Props) {
               </div>
             </div>
             <textarea
-              className="w-full min-h-24 max-h-60 overflow-y-scroll resize-none rounded-2xl border border-sidebar-active/60 bg-white px-4 py-3 text-sm text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30 custom-scrollbar placeholder:text-sidebar-text/30"
+              ref={messageInputRef}
+              className="w-full min-h-24 rounded-2xl border border-sidebar-active/60 bg-white px-4 py-3 text-sm text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30 custom-scrollbar placeholder:text-sidebar-text/30"
               placeholder="您可以输入您的需求，让AI为您生成..."
               value={currentInput}
               disabled={sending}
               onChange={(event) => {
                 const value = event.target.value;
                 setCurrentInput(value);
+                resizeMessageInput();
                 if (currentConversationId) {
                   saveDraft(currentConversationId, value);
                 }
