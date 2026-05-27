@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 
 type Agent = {
@@ -68,6 +70,74 @@ function formatDateTime(value: string) {
   }
   return date.toLocaleString("zh-CN", { hour12: false });
 }
+
+const markdownComponents: Components = {
+  table({ children }) {
+    return (
+      <div className="my-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table className="min-w-full border-collapse text-sm">{children}</table>
+      </div>
+    );
+  },
+  thead({ children }) {
+    return <thead className="bg-slate-50">{children}</thead>;
+  },
+  tbody({ children }) {
+    return <tbody className="divide-y divide-slate-100">{children}</tbody>;
+  },
+  tr({ children }) {
+    return <tr className="align-top even:bg-slate-50/40">{children}</tr>;
+  },
+  th({ children }) {
+    return (
+      <th className="border-b border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-700">
+        {children}
+      </th>
+    );
+  },
+  td({ children }) {
+    return (
+      <td className="border-b border-slate-100 px-3 py-2 whitespace-pre-wrap text-sm text-slate-700">
+        {children}
+      </td>
+    );
+  },
+  blockquote({ children }) {
+    return (
+      <blockquote className="my-4 rounded-r-xl border-l-4 border-slate-300 bg-slate-50 px-4 py-3 text-slate-700">
+        {children}
+      </blockquote>
+    );
+  },
+  hr() {
+    return <hr className="my-6 border-slate-200" />;
+  },
+  pre({ children }) {
+    return (
+      <pre className="my-4 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100">
+        {children}
+      </pre>
+    );
+  },
+  code({ className, children, ...props }) {
+    const isBlock = Boolean(className);
+    if (isBlock) {
+      return (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
+    }
+    return (
+      <code
+        className="rounded bg-slate-100 px-1.5 py-0.5 text-[0.9em] text-slate-800"
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  }
+};
 
 function AgentMenuIcon({ slug }: { slug: string }) {
   const className = "h-4 w-4 shrink-0 opacity-80";
@@ -3128,13 +3198,17 @@ export default function ChatApp(props: Props) {
                               data-copy-result-id={
                                 message.role === "assistant" ? String(message.id) : undefined
                               }
-                              className={`prose prose-sm max-w-none prose-headings:font-bold prose-p:leading-relaxed prose-p:my-3 prose-h1:text-xl prose-h2:text-lg prose-h3:text-base ${
+                              className={`prose prose-sm max-w-none prose-headings:mb-3 prose-headings:font-bold prose-p:leading-7 prose-p:my-3 prose-li:my-1 prose-ul:my-3 prose-ol:my-3 prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-hr:my-6 prose-code:before:content-none prose-code:after:content-none prose-pre:my-4 prose-pre:bg-transparent prose-pre:p-0 ${
                                 message.role === "user"
                                   ? "prose-headings:text-sidebar-text prose-p:text-sidebar-text text-sidebar-text"
-                                  : "prose-headings:text-slate-800 prose-li:marker:text-slate-400 text-slate-700"
+                                  : "prose-headings:text-slate-800 prose-strong:text-slate-900 prose-li:marker:text-slate-400 prose-p:text-slate-700 text-slate-700"
                               }`}
                             >
-                              <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeHighlight]}
+                                components={markdownComponents}
+                              >
                                 {displayedContent}
                               </ReactMarkdown>
                             </div>
