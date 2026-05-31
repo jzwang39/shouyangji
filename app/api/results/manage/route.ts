@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { query } from "@/lib/db";
+import { canUserAccessSpecialMenu } from "@/lib/chat";
 
 type AgentResultRow = {
   id: number;
@@ -27,6 +28,14 @@ export async function GET(request: Request) {
 
   const userId = Number((session.user as any).id);
   const userRole = String((session.user as any).role ?? "");
+  const hasAccess = await canUserAccessSpecialMenu(
+    userId,
+    userRole,
+    "data-management"
+  );
+  if (!hasAccess) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
   const allowAll = canViewAll(userRole);
   const url = new URL(request.url);
   const productName = String(url.searchParams.get("productName") ?? "").trim();
@@ -87,6 +96,14 @@ export async function PATCH(request: Request) {
 
   const userId = Number((session.user as any).id);
   const userRole = String((session.user as any).role ?? "");
+  const hasAccess = await canUserAccessSpecialMenu(
+    userId,
+    userRole,
+    "data-management"
+  );
+  if (!hasAccess) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
   const allowAll = canViewAll(userRole);
   const body = await request.json();
   const id = Number(body.id);

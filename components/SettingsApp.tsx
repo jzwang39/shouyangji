@@ -49,6 +49,7 @@ type AgentRole = {
   id: number;
   name: string;
   agentIds: number[];
+  menuKeys: string[];
 };
 
 type AgentPromptRow = {
@@ -74,6 +75,10 @@ type Props = {
   initialLogs: LogRow[];
   initialAgents: AgentRow[];
 };
+
+const SPECIAL_MENU_OPTIONS = [
+  { key: "data-management", name: "数据管理" }
+];
 
 export default function SettingsApp(props: Props) {
   const { currentUser, initialAiSetting, initialUsers, initialLogs, initialAgents } =
@@ -102,11 +107,13 @@ export default function SettingsApp(props: Props) {
   >({});
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleAgentIds, setNewRoleAgentIds] = useState<number[]>([]);
+  const [newRoleMenuKeys, setNewRoleMenuKeys] = useState<string[]>([]);
   const [creatingRole, setCreatingRole] = useState(false);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [editingRole, setEditingRole] = useState<AgentRole | null>(null);
   const [editRoleName, setEditRoleName] = useState("");
   const [editRoleAgentIds, setEditRoleAgentIds] = useState<number[]>([]);
+  const [editRoleMenuKeys, setEditRoleMenuKeys] = useState<string[]>([]);
   const [savingRoleEdit, setSavingRoleEdit] = useState(false);
   const [newUser, setNewUser] = useState({
     username: "",
@@ -337,6 +344,14 @@ export default function SettingsApp(props: Props) {
     );
   };
 
+  const handleToggleNewRoleMenu = (menuKey: string) => {
+    setNewRoleMenuKeys((prev) =>
+      prev.includes(menuKey)
+        ? prev.filter((key) => key !== menuKey)
+        : [...prev, menuKey]
+    );
+  };
+
   const handleCreateRole = async () => {
     const name = newRoleName.trim();
     if (!name) {
@@ -355,7 +370,8 @@ export default function SettingsApp(props: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          agentIds: newRoleAgentIds
+          agentIds: newRoleAgentIds,
+          menuKeys: newRoleMenuKeys
         })
       });
       if (!res.ok) {
@@ -363,6 +379,7 @@ export default function SettingsApp(props: Props) {
       }
       setNewRoleName("");
       setNewRoleAgentIds([]);
+      setNewRoleMenuKeys([]);
       await reloadRoles();
     } catch (e: any) {
       setError(e.message ?? "创建角色失败");
@@ -375,6 +392,7 @@ export default function SettingsApp(props: Props) {
     setEditingRole(role);
     setEditRoleName(role.name);
     setEditRoleAgentIds(role.agentIds);
+    setEditRoleMenuKeys(role.menuKeys ?? []);
     setError(null);
   };
 
@@ -383,6 +401,14 @@ export default function SettingsApp(props: Props) {
       prev.includes(agentId)
         ? prev.filter((id) => id !== agentId)
         : [...prev, agentId]
+    );
+  };
+
+  const handleToggleEditRoleMenu = (menuKey: string) => {
+    setEditRoleMenuKeys((prev) =>
+      prev.includes(menuKey)
+        ? prev.filter((key) => key !== menuKey)
+        : [...prev, menuKey]
     );
   };
 
@@ -406,7 +432,8 @@ export default function SettingsApp(props: Props) {
         body: JSON.stringify({
           id: editingRole.id,
           name,
-          agentIds: editRoleAgentIds
+          agentIds: editRoleAgentIds,
+          menuKeys: editRoleMenuKeys
         })
       });
       if (!res.ok) {
@@ -950,6 +977,28 @@ export default function SettingsApp(props: Props) {
                       );
                     })}
                   </div>
+                  <div className="mt-3 mb-1 block text-[11px] text-slate-600">
+                    包含的菜单
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {SPECIAL_MENU_OPTIONS.map((menu) => {
+                      const selected = newRoleMenuKeys.includes(menu.key);
+                      return (
+                        <button
+                          key={menu.key}
+                          type="button"
+                          className={`rounded-lg px-3 py-1.5 text-[11px] transition-colors ${
+                            selected
+                              ? "bg-primary text-white"
+                              : "bg-sidebar-active/60 text-sidebar-text hover:bg-sidebar-active"
+                          }`}
+                          onClick={() => handleToggleNewRoleMenu(menu.key)}
+                        >
+                          {menu.name}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
               <button
@@ -979,7 +1028,7 @@ export default function SettingsApp(props: Props) {
                   <thead>
                     <tr className="bg-sidebar">
                       <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">角色名称</th>
-                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">包含的智能体</th>
+                      <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">包含的智能体/菜单</th>
                       {(currentUser.role === "admin" ||
                         currentUser.role === "super_admin") && (
                         <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">操作</th>
@@ -988,9 +1037,17 @@ export default function SettingsApp(props: Props) {
                   </thead>
                   <tbody>
                     {agentRoles.map((role) => {
-                      const names = agents
+                      const agentNames = agents
                         .filter((agent) => role.agentIds.includes(agent.id))
                         .map((agent) => agent.name)
+                        .join("、");
+                      const menuNames = SPECIAL_MENU_OPTIONS.filter((menu) =>
+                        (role.menuKeys ?? []).includes(menu.key)
+                      )
+                        .map((menu) => menu.name)
+                        .join("、");
+                      const names = [agentNames, menuNames]
+                        .filter((item) => !!item)
                         .join("、");
                       return (
                         <tr key={role.id} className="border-b border-sidebar-active/20 hover:bg-sidebar/40 transition-colors">
@@ -1078,6 +1135,31 @@ export default function SettingsApp(props: Props) {
                               disabled={savingRoleEdit}
                             >
                               {agent.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-3 mb-1.5 block text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
+                        包含的菜单
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {SPECIAL_MENU_OPTIONS.map((menu) => {
+                          const selected = editRoleMenuKeys.includes(menu.key);
+                          return (
+                            <button
+                              key={menu.key}
+                              type="button"
+                              className={`rounded-lg px-3 py-1.5 text-[11px] transition-colors ${
+                                selected
+                                  ? "bg-primary text-white"
+                                  : "bg-sidebar-active/60 text-sidebar-text hover:bg-sidebar-active"
+                              }`}
+                              onClick={() =>
+                                handleToggleEditRoleMenu(menu.key)
+                              }
+                              disabled={savingRoleEdit}
+                            >
+                              {menu.name}
                             </button>
                           );
                         })}

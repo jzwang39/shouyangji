@@ -25,21 +25,37 @@ export async function GET() {
   const roles = await query<{ id: number; name: string }>(
     "SELECT id, name FROM agent_roles ORDER BY id ASC"
   );
-  const members = await query<{ role_id: number; agent_id: number }>(
-    "SELECT role_id, agent_id FROM agent_role_members"
-  );
+  const [members, menuMembers] = await Promise.all([
+    query<{ role_id: number; agent_id: number }>(
+      "SELECT role_id, agent_id FROM agent_role_members"
+    ),
+    query<{ role_id: number; menu_key: string }>(
+      "SELECT role_id, menu_key FROM agent_role_menu_members"
+    )
+  ]);
 
   const roleMap = new Map<
     number,
-    { id: number; name: string; agentIds: number[] }
+    { id: number; name: string; agentIds: number[]; menuKeys: string[] }
   >();
   for (const role of roles) {
-    roleMap.set(role.id, { id: role.id, name: role.name, agentIds: [] });
+    roleMap.set(role.id, {
+      id: role.id,
+      name: role.name,
+      agentIds: [],
+      menuKeys: []
+    });
   }
   for (const member of members) {
     const role = roleMap.get(member.role_id);
     if (role) {
       role.agentIds.push(member.agent_id);
+    }
+  }
+  for (const member of menuMembers) {
+    const role = roleMap.get(member.role_id);
+    if (role) {
+      role.menuKeys.push(member.menu_key);
     }
   }
 
@@ -61,6 +77,15 @@ export async function POST(request: Request) {
   const name = String(body.name ?? "").trim();
   const agentIds = Array.isArray(body.agentIds)
     ? body.agentIds.map((id: any) => Number(id)).filter((id: number) => id > 0)
+    : [];
+  const menuKeys = Array.isArray(body.menuKeys)
+    ? Array.from(
+        new Set(
+          body.menuKeys
+            .map((key: any) => String(key ?? "").trim())
+            .filter((key: string) => !!key)
+        )
+      )
     : [];
 
   if (!name) {
@@ -87,6 +112,20 @@ export async function POST(request: Request) {
       values
     );
   }
+  if (menuKeys.length > 0) {
+    const values: any[] = [];
+    const placeholders: string[] = [];
+    for (const menuKey of menuKeys) {
+      placeholders.push("(?, ?)");
+      values.push(roleId, menuKey);
+    }
+    await query(
+      `INSERT INTO agent_role_menu_members (role_id, menu_key) VALUES ${placeholders.join(
+        ", "
+      )}`,
+      values
+    );
+  }
 
   await logOperation({
     userId,
@@ -95,7 +134,8 @@ export async function POST(request: Request) {
     targetId: roleId,
     metadata: {
       name,
-      agentIds
+      agentIds,
+      menuKeys
     }
   });
 
@@ -122,6 +162,15 @@ export async function PUT(request: Request) {
           body.agentIds
             .map((id: any) => Number(id))
             .filter((id: number) => id > 0)
+        )
+      )
+    : [];
+  const menuKeys = Array.isArray(body.menuKeys)
+    ? Array.from(
+        new Set(
+          body.menuKeys
+            .map((key: any) => String(key ?? "").trim())
+            .filter((key: string) => !!key)
         )
       )
     : [];
@@ -154,6 +203,9 @@ export async function PUT(request: Request) {
     await conn.query("DELETE FROM agent_role_members WHERE role_id = ?", [
       roleId
     ]);
+    await conn.query("DELETE FROM agent_role_menu_members WHERE role_id = ?", [
+      roleId
+    ]);
 
     const values: any[] = [];
     const placeholders: string[] = [];
@@ -167,6 +219,20 @@ export async function PUT(request: Request) {
       )}`,
       values
     );
+    if (menuKeys.length > 0) {
+      const menuValues: any[] = [];
+      const menuPlaceholders: string[] = [];
+      for (const menuKey of menuKeys) {
+        menuPlaceholders.push("(?, ?)");
+        menuValues.push(roleId, menuKey);
+      }
+      await conn.query(
+        `INSERT INTO agent_role_menu_members (role_id, menu_key) VALUES ${menuPlaceholders.join(
+          ", "
+        )}`,
+        menuValues
+      );
+    }
     await conn.commit();
   } catch (e) {
     try {
@@ -184,7 +250,8 @@ export async function PUT(request: Request) {
     targetId: roleId,
     metadata: {
       name,
-      agentIds
+      agentIds,
+      menuKeys
     }
   });
 
@@ -228,6 +295,9 @@ export async function DELETE(request: Request) {
   try {
     await conn.beginTransaction();
     await conn.query("DELETE FROM agent_role_members WHERE role_id = ?", [
+      roleId
+    ]);
+    await conn.query("DELETE FROM agent_role_menu_members WHERE role_id = ?", [
       roleId
     ]);
     await conn.query("DELETE FROM agent_roles WHERE id = ?", [roleId]);

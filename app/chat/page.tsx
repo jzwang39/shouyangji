@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { listAgents, listConversations } from "@/lib/chat";
+import { getUserChatAccess, listConversations } from "@/lib/chat";
 import ChatApp from "@/components/ChatApp";
 
 export default async function ChatPage() {
@@ -10,20 +10,19 @@ export default async function ChatPage() {
     redirect("/login");
   }
   const userId = Number((session.user as any).id);
-  const [agents, conversations] = await Promise.all([
-    listAgents(),
-    listConversations(userId)
-  ]);
+  const userRole = (session.user as any).role ?? "user";
+  const access = await getUserChatAccess(userId, userRole);
+  const conversations = await listConversations(userId, access.allowedAgentIds);
   return (
     <ChatApp
       user={{
         id: userId,
         username: session.user.name ?? "",
-        role: (session.user as any).role ?? "user"
+        role: userRole
       }}
-      agents={agents}
+      agents={access.agents}
+      allowedMenuKeys={access.menuKeys}
       initialConversations={conversations}
     />
   );
 }
-

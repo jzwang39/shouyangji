@@ -60,6 +60,7 @@ type ManagedResultRow = {
 type Props = {
   user: UserInfo;
   agents: Agent[];
+  allowedMenuKeys: string[];
   initialConversations: Conversation[];
 };
 
@@ -916,7 +917,7 @@ ${lastPrompt || "（提示词缺失）"}`;
 
 export default function ChatApp(props: Props) {
   // Update timestamp: 2026-03-05 17:35
-  const { user, agents, initialConversations } = props;
+  const { user, agents, allowedMenuKeys, initialConversations } = props;
 
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const lastAssistantContentRef = useRef<HTMLDivElement | null>(null);
@@ -1044,6 +1045,7 @@ export default function ChatApp(props: Props) {
     () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
     [agents, selectedAgentId]
   );
+  const canAccessDataManagement = allowedMenuKeys.includes("data-management");
 
   const isAdminViewer = user.role === "admin" || user.role === "super_admin";
 
@@ -1569,11 +1571,17 @@ export default function ChatApp(props: Props) {
   };
 
   const handleOpenDataManagement = useCallback(() => {
+    if (!canAccessDataManagement) return;
     void cleanupCurrentConversationIfEmpty();
     setActivePanel("data-management");
     setMobileSidebarOpen(false);
     void loadManagedResults(dataManagementFilters);
-  }, [cleanupCurrentConversationIfEmpty, dataManagementFilters, loadManagedResults]);
+  }, [
+    canAccessDataManagement,
+    cleanupCurrentConversationIfEmpty,
+    dataManagementFilters,
+    loadManagedResults
+  ]);
 
   const handleSearchManagedResults = useCallback(() => {
     void loadManagedResults(dataManagementFilters);
@@ -2506,35 +2514,37 @@ export default function ChatApp(props: Props) {
                     </span>
                   </button>
                 ))}
-                <button
-                  type="button"
-                  className={`flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
-                    activePanel === "data-management"
-                      ? "bg-sidebar-active font-medium"
-                      : "hover:bg-sidebar-hover"
-                  }`}
-                  onClick={handleOpenDataManagement}
-                >
-                  <span className="flex min-w-0 items-center gap-2.5">
-                    <svg
-                      className="h-4 w-4 shrink-0 opacity-80"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M4 5h16" />
-                      <path d="M4 12h16" />
-                      <path d="M4 19h16" />
-                      <path d="M8 3v4" />
-                      <path d="M16 10v4" />
-                      <path d="M12 17v4" />
-                    </svg>
-                    <span className="truncate">数据管理</span>
-                  </span>
-                </button>
+                {canAccessDataManagement ? (
+                  <button
+                    type="button"
+                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
+                      activePanel === "data-management"
+                        ? "bg-sidebar-active font-medium"
+                        : "hover:bg-sidebar-hover"
+                    }`}
+                    onClick={handleOpenDataManagement}
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <svg
+                        className="h-4 w-4 shrink-0 opacity-80"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M4 5h16" />
+                        <path d="M4 12h16" />
+                        <path d="M4 19h16" />
+                        <path d="M8 3v4" />
+                        <path d="M16 10v4" />
+                        <path d="M12 17v4" />
+                      </svg>
+                      <span className="truncate">数据管理</span>
+                    </span>
+                  </button>
+                ) : null}
               </div>
             </div>
             <div className="mt-8 px-5 pb-4">
@@ -2744,35 +2754,37 @@ export default function ChatApp(props: Props) {
                   </span>
                 </button>
               ))}
-              <button
-                type="button"
-                className={`rounded px-2 py-1 text-xs transition-colors ${
-                  activePanel === "data-management"
-                    ? "bg-sidebar-active"
-                    : "bg-sidebar-hover"
-                }`}
-                onClick={handleOpenDataManagement}
-              >
-                <span className="flex items-center gap-1.5">
-                  <svg
-                    className="h-4 w-4 shrink-0 opacity-80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M4 5h16" />
-                    <path d="M4 12h16" />
-                    <path d="M4 19h16" />
-                    <path d="M8 3v4" />
-                    <path d="M16 10v4" />
-                    <path d="M12 17v4" />
-                  </svg>
-                  <span className="truncate">数据管理</span>
-                </span>
-              </button>
+              {canAccessDataManagement ? (
+                <button
+                  type="button"
+                  className={`rounded px-2 py-1 text-xs transition-colors ${
+                    activePanel === "data-management"
+                      ? "bg-sidebar-active"
+                      : "bg-sidebar-hover"
+                  }`}
+                  onClick={handleOpenDataManagement}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <svg
+                      className="h-4 w-4 shrink-0 opacity-80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 5h16" />
+                      <path d="M4 12h16" />
+                      <path d="M4 19h16" />
+                      <path d="M8 3v4" />
+                      <path d="M16 10v4" />
+                      <path d="M12 17v4" />
+                    </svg>
+                    <span className="truncate">数据管理</span>
+                  </span>
+                </button>
+              ) : null}
             </div>
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs opacity-60">对话</span>
