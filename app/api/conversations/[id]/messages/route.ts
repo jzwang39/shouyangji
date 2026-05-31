@@ -451,6 +451,7 @@ ${content}`
 
               try {
                 const final = await callAiWithPrompt(prompt, {
+                  agentSlug: conversation.slug,
                   messages: aiMessages,
                   onDelta: async (delta) => {
                     if (!delta) return;
@@ -544,7 +545,10 @@ ${content}`
         let aiText = "";
         let isError = false;
         try {
-          aiText = await callAiWithPrompt(prompt, { messages: aiMessages });
+          aiText = await callAiWithPrompt(prompt, {
+            agentSlug: conversation.slug,
+            messages: aiMessages
+          });
           if (!String(aiText ?? "").trim()) {
             aiText = EMPTY_AI_REPLY_FALLBACK;
           }

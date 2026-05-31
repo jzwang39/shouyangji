@@ -894,6 +894,7 @@ ${lastkegang || "（当前为第一节课程，无上一节课大纲）"}
 
 type CallAiWithPromptOptions = {
   onDelta?: (delta: string) => void | Promise<void>;
+  agentSlug?: string;
   messages?: Array<{
     role: "system" | "user" | "assistant";
     content: string;
@@ -950,10 +951,30 @@ export async function callAiWithPrompt(
     );
   };
 
+  const normalizedAgentSlug = normalizeAgentSlug(String(options.agentSlug ?? ""));
+
+  const isFourThingsPrompt = (text: string) => {
+    const source = String(text ?? "");
+    return (
+      normalizedAgentSlug === "four-things" ||
+      (source.includes("四件事") &&
+        source.includes("一、相信自己") &&
+        source.includes("四、让客户相信"))
+    );
+  };
+
   const hasStructuredSection = (text: string, marker: string) => {
     const source = String(text ?? "");
     const escaped = escapeRegExp(marker);
     return new RegExp(`(^|\\n)\\s*(?:\\*\\*)?${escaped}`, "m").test(source);
+  };
+
+  const isFourThingsOutputCompleteEnough = (text: string) => {
+    return (
+      hasStructuredSection(text, "三、") &&
+      hasStructuredSection(text, "四、") &&
+      text.includes("申请完了不要走")
+    );
   };
 
   const isNineGridOutputCompleteEnough = (text: string) => {
@@ -965,6 +986,9 @@ export async function callAiWithPrompt(
 
   const shouldForceContinue = (basePrompt: string, text: string) => {
     if (!text.trim()) return false;
+    if (isFourThingsPrompt(basePrompt)) {
+      return !isFourThingsOutputCompleteEnough(text);
+    }
     if (isNineGridPrompt(basePrompt)) {
       return !isNineGridOutputCompleteEnough(text);
     }
