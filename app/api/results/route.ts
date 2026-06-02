@@ -20,9 +20,10 @@ const PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES = [
   PRODUCT_ONE_PAGER_AGENT_NAME,
   "产品一页纸"
 ];
-const COURSE_OUTLINE_AGENT_NAME = "课纲助手「单一产品」";
+const COURSE_OUTLINE_AGENT_NAME = "课纲助手「多方法论」";
 const COURSE_OUTLINE_AGENT_NAME_ALIASES = [
   COURSE_OUTLINE_AGENT_NAME,
+  "课纲助手「单一产品」",
   "课纲助手",
   "课纲"
 ];

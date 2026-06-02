@@ -65,7 +65,7 @@ type Props = {
 };
 
 const PRODUCT_ONE_PAGER_AGENT_NAME = "产品一页纸「单一产品」";
-const COURSE_OUTLINE_AGENT_NAME = "课纲助手「单一产品」";
+const COURSE_OUTLINE_AGENT_NAME = "课纲助手「多方法论」";
 
 function formatDateTime(value: string) {
   const date = new Date(value);
