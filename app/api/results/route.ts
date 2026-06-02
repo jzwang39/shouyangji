@@ -20,10 +20,19 @@ const PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES = [
   PRODUCT_ONE_PAGER_AGENT_NAME,
   "产品一页纸"
 ];
+const COURSE_OUTLINE_AGENT_NAME = "课纲助手「单一产品」";
+const COURSE_OUTLINE_AGENT_NAME_ALIASES = [
+  COURSE_OUTLINE_AGENT_NAME,
+  "课纲助手",
+  "课纲"
+];
 
 function normalizeAgentNameForStorage(agentName: string) {
   if (PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.includes(agentName)) {
     return PRODUCT_ONE_PAGER_AGENT_NAME;
+  }
+  if (COURSE_OUTLINE_AGENT_NAME_ALIASES.includes(agentName)) {
+    return COURSE_OUTLINE_AGENT_NAME;
   }
   return agentName;
 }
@@ -31,6 +40,9 @@ function normalizeAgentNameForStorage(agentName: string) {
 function getAgentNameCandidates(agentName: string) {
   if (PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.includes(agentName)) {
     return PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES;
+  }
+  if (COURSE_OUTLINE_AGENT_NAME_ALIASES.includes(agentName)) {
+    return COURSE_OUTLINE_AGENT_NAME_ALIASES;
   }
   return [agentName];
 }

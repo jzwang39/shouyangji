@@ -65,6 +65,7 @@ type Props = {
 };
 
 const PRODUCT_ONE_PAGER_AGENT_NAME = "产品一页纸「单一产品」";
+const COURSE_OUTLINE_AGENT_NAME = "课纲助手「单一产品」";
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -1386,7 +1387,7 @@ export default function ChatApp(props: Props) {
                   { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
                   { key: "fourThingsContent", agentName: "四件事" },
                   { key: "nineGridContent", agentName: "九宫格" },
-                  { key: "courseOutlineContent", agentName: "课纲" }
+                  { key: "courseOutlineContent", agentName: COURSE_OUTLINE_AGENT_NAME }
                 ]
               : isFourThingsAgent(currentAgent) || isNineGridAgent(currentAgent)
               ? [
@@ -2331,7 +2332,7 @@ export default function ChatApp(props: Props) {
       if (slug === "positioning-helper") return "定位";
       if (slug === "four-things") return "四件事";
       if (slug === "nine-grid") return "九宫格";
-      if (slug === "course-outline") return "课纲";
+      if (slug === "course-outline") return COURSE_OUTLINE_AGENT_NAME;
       if (slug === "course-transcript") return "课程";
       if (slug === "material-tagging-assistant") return "素材标记";
       if (slug === "deterministic-material-capture-assistant") return "确定性素材抓取";
@@ -3568,7 +3569,7 @@ export default function ChatApp(props: Props) {
                       </div>
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
-                          课纲结果内容
+                          {COURSE_OUTLINE_AGENT_NAME}结果内容
                         </label>
                         <textarea
                           className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -3916,7 +3917,9 @@ export default function ChatApp(props: Props) {
                       <option value="定位">定位</option>
                       <option value="四件事">四件事</option>
                       <option value="九宫格">九宫格</option>
-                      <option value="课纲">课纲</option>
+                      <option value={COURSE_OUTLINE_AGENT_NAME}>
+                        {COURSE_OUTLINE_AGENT_NAME}
+                      </option>
                       <option value="课程">课程</option>
                       <option value="素材标记">素材标记</option>
                       <option value="确定性素材抓取">确定性素材抓取</option>
