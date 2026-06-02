@@ -15,6 +15,26 @@ type AgentResultRow = {
   updated_at: string;
 };
 
+const PRODUCT_ONE_PAGER_AGENT_NAME = "产品一页纸「单一产品」";
+const PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES = [
+  PRODUCT_ONE_PAGER_AGENT_NAME,
+  "产品一页纸"
+];
+
+function normalizeAgentNameForStorage(agentName: string) {
+  if (PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.includes(agentName)) {
+    return PRODUCT_ONE_PAGER_AGENT_NAME;
+  }
+  return agentName;
+}
+
+function getAgentNameCandidates(agentName: string) {
+  if (PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.includes(agentName)) {
+    return PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES;
+  }
+  return [agentName];
+}
+
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -34,9 +54,21 @@ export async function GET(request: Request) {
         status: 400
       });
     }
+    const agentNameCandidates = getAgentNameCandidates(agentName);
+    const placeholders = agentNameCandidates.map(() => "?").join(", ");
     const rows = await query<AgentResultRow>(
-      "SELECT id, product_name, agent_name, lesson_count, operator_user_id, operator_name, result_content, created_at, updated_at FROM agent_results WHERE product_name = ? AND agent_name = ? AND lesson_count = ? AND operator_user_id = ? LIMIT 1",
-      [productName, agentName, lessonCount, userId]
+      `SELECT id, product_name, agent_name, lesson_count, operator_user_id, operator_name, result_content, created_at, updated_at
+       FROM agent_results
+       WHERE product_name = ? AND agent_name IN (${placeholders}) AND lesson_count = ? AND operator_user_id = ?
+       ORDER BY FIELD(agent_name, ${placeholders})
+       LIMIT 1`,
+      [
+        productName,
+        ...agentNameCandidates,
+        lessonCount,
+        userId,
+        ...agentNameCandidates
+      ]
     );
     if (!rows.length) {
       return NextResponse.json(null);
@@ -55,9 +87,15 @@ export async function GET(request: Request) {
     });
   }
   if (productName && agentName && lessonCountRaw === null) {
+    const agentNameCandidates = getAgentNameCandidates(agentName);
+    const placeholders = agentNameCandidates.map(() => "?").join(", ");
     const rows = await query<AgentResultRow>(
-      "SELECT id, product_name, agent_name, lesson_count, operator_user_id, operator_name, result_content, created_at, updated_at FROM agent_results WHERE product_name = ? AND agent_name = ? AND operator_user_id = ? ORDER BY lesson_count ASC LIMIT 1",
-      [productName, agentName, userId]
+      `SELECT id, product_name, agent_name, lesson_count, operator_user_id, operator_name, result_content, created_at, updated_at
+       FROM agent_results
+       WHERE product_name = ? AND agent_name IN (${placeholders}) AND operator_user_id = ?
+       ORDER BY lesson_count ASC, FIELD(agent_name, ${placeholders})
+       LIMIT 1`,
+      [productName, ...agentNameCandidates, userId, ...agentNameCandidates]
     );
     if (!rows.length) {
       return NextResponse.json(null);
@@ -98,7 +136,9 @@ export async function POST(request: Request) {
   const operatorName = String((session.user as any).name ?? "");
   const body = await request.json();
   const productName = String(body.productName ?? "").trim();
-  const agentName = String(body.agentName ?? "").trim();
+  const agentName = normalizeAgentNameForStorage(
+    String(body.agentName ?? "").trim()
+  );
   const lessonCountRaw = body.lessonCount;
   const resultContent = String(body.resultContent ?? "").trim();
   if (!productName) {

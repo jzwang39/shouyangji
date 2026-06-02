@@ -16,6 +16,19 @@ type AgentResultRow = {
   updated_at: string;
 };
 
+const PRODUCT_ONE_PAGER_AGENT_NAME = "产品一页纸「单一产品」";
+const PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES = [
+  PRODUCT_ONE_PAGER_AGENT_NAME,
+  "产品一页纸"
+];
+
+function normalizeAgentNameForDisplay(agentName: string) {
+  if (PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.includes(agentName)) {
+    return PRODUCT_ONE_PAGER_AGENT_NAME;
+  }
+  return agentName;
+}
+
 function canViewAll(role: string) {
   return role === "admin" || role === "super_admin";
 }
@@ -58,8 +71,15 @@ export async function GET(request: Request) {
     params.push(`%${operatorName}%`);
   }
   if (agentName) {
-    conditions.push("agent_name LIKE ?");
-    params.push(`%${agentName}%`);
+    if (PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.includes(agentName)) {
+      conditions.push(
+        `agent_name IN (${PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.map(() => "?").join(", ")})`
+      );
+      params.push(...PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES);
+    } else {
+      conditions.push("agent_name LIKE ?");
+      params.push(`%${agentName}%`);
+    }
   }
 
   const whereClause =
@@ -77,7 +97,7 @@ export async function GET(request: Request) {
     rows.map((row) => ({
       id: row.id,
       productName: row.product_name,
-      agentName: row.agent_name,
+      agentName: normalizeAgentNameForDisplay(row.agent_name),
       lessonCount: row.lesson_count,
       operatorUserId: row.operator_user_id,
       operatorName: row.operator_name,
@@ -147,7 +167,7 @@ export async function PATCH(request: Request) {
   return NextResponse.json({
     id: row.id,
     productName: row.product_name,
-    agentName: row.agent_name,
+    agentName: normalizeAgentNameForDisplay(row.agent_name),
     lessonCount: row.lesson_count,
     operatorUserId: row.operator_user_id,
     operatorName: row.operator_name,

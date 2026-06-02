@@ -64,6 +64,8 @@ type Props = {
   initialConversations: Conversation[];
 };
 
+const PRODUCT_ONE_PAGER_AGENT_NAME = "产品一页纸「单一产品」";
+
 function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -1375,20 +1377,20 @@ export default function ChatApp(props: Props) {
           }[] =
             isCourseOutlineAgent(currentAgent)
               ? [
-                  { key: "content", agentName: "产品一页纸" },
+                  { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
                   { key: "fourThingsContent", agentName: "四件事" },
                   { key: "nineGridContent", agentName: "九宫格" }
                 ]
               : isCourseTranscriptAgent(currentAgent)
               ? [
-                  { key: "content", agentName: "产品一页纸" },
+                  { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
                   { key: "fourThingsContent", agentName: "四件事" },
                   { key: "nineGridContent", agentName: "九宫格" },
                   { key: "courseOutlineContent", agentName: "课纲" }
                 ]
               : isFourThingsAgent(currentAgent) || isNineGridAgent(currentAgent)
               ? [
-                  { key: "content", agentName: "产品一页纸" },
+                  { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
                   { key: "positioningContent", agentName: "定位" }
                 ]
               : isAnyMaterialCaptureAgent(currentAgent)
@@ -1396,7 +1398,7 @@ export default function ChatApp(props: Props) {
                   { key: "materialTaggingContent", agentName: "素材标记" }
                 ]
               : [
-                  { key: "content", agentName: "产品一页纸" }
+                  { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME }
                 ];
           const results = await Promise.all(
             queries.map(async ({ key, agentName }) => {
@@ -1429,7 +1431,7 @@ export default function ChatApp(props: Props) {
         } else {
           const params = new URLSearchParams({
             productName: name,
-            agentName: "产品一页纸"
+            agentName: PRODUCT_ONE_PAGER_AGENT_NAME
           });
           const res = await fetch(`/api/results?${params.toString()}`, {
             signal: controller.signal
@@ -1460,7 +1462,7 @@ export default function ChatApp(props: Props) {
         }
       } catch (e: any) {
         if (e?.name === "AbortError") return;
-        setError(getErrorMessage(e, "加载产品一页纸结果失败"));
+        setError(getErrorMessage(e, `加载${PRODUCT_ONE_PAGER_AGENT_NAME}结果失败`));
       }
     };
     load();
@@ -2325,7 +2327,7 @@ export default function ChatApp(props: Props) {
 
   const resolveAgentDisplayName = useCallback(
     (slug: string, fallback: string) => {
-      if (slug === "product-one-pager") return "产品一页纸";
+      if (slug === "product-one-pager") return PRODUCT_ONE_PAGER_AGENT_NAME;
       if (slug === "positioning-helper") return "定位";
       if (slug === "four-things") return "四件事";
       if (slug === "nine-grid") return "九宫格";
@@ -3135,7 +3137,7 @@ export default function ChatApp(props: Props) {
                 {!loadingMessages && messages.length === 0 ? (
                   <div className="mt-12 text-center text-sm text-slate-400">
                     {currentAgent?.slug === "product-one-pager"
-                      ? '我是一位大健康产品策划顾问，专门帮助产品团队梳理"产品基本信息一页纸"，可以输入：开始'
+                      ? `我是一位大健康产品策划顾问，专门帮助产品团队梳理"${PRODUCT_ONE_PAGER_AGENT_NAME}"，可以输入：开始`
                       : "还没有消息，输入内容开始对话"}
                   </div>
                 ) : null}
@@ -3337,7 +3339,7 @@ export default function ChatApp(props: Props) {
                   <div className="text-sm font-semibold">
                     {currentAgent && isAnyMaterialCaptureAgent(currentAgent)
                       ? "引用素材标记结果"
-                      : "引用产品一页纸结果"}
+                      : `引用${PRODUCT_ONE_PAGER_AGENT_NAME}结果`}
                   </div>
                   <button
                     type="button"
@@ -3387,7 +3389,7 @@ export default function ChatApp(props: Props) {
                     <>
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
-                          产品一页纸结果内容
+                          {PRODUCT_ONE_PAGER_AGENT_NAME}结果内容
                         </label>
                         <textarea
                           className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -3512,7 +3514,7 @@ export default function ChatApp(props: Props) {
                     <>
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
-                          产品一页纸结果内容
+                          {PRODUCT_ONE_PAGER_AGENT_NAME}结果内容
                         </label>
                         <textarea
                           className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -3663,7 +3665,7 @@ export default function ChatApp(props: Props) {
                     <>
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
-                          产品一页纸结果内容
+                          {PRODUCT_ONE_PAGER_AGENT_NAME}结果内容
                         </label>
                         <textarea
                           className="h-40 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -3908,7 +3910,9 @@ export default function ChatApp(props: Props) {
                       }
                     >
                       <option value="">请选择</option>
-                      <option value="产品一页纸">产品一页纸</option>
+                      <option value={PRODUCT_ONE_PAGER_AGENT_NAME}>
+                        {PRODUCT_ONE_PAGER_AGENT_NAME}
+                      </option>
                       <option value="定位">定位</option>
                       <option value="四件事">四件事</option>
                       <option value="九宫格">九宫格</option>
