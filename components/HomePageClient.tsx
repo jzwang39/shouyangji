@@ -73,7 +73,7 @@ export default function HomePageClient({ user }: Props) {
               更快地写作、规划与产出
             </h1>
             <p className="mt-5 text-pretty text-base leading-relaxed text-slate-600 md:text-lg">
-              用一套清晰的智能体能力，帮你把想法变成可执行方案。从产品一页纸「单一产品」到课程逐字稿，少走弯路，稳定交付。
+              用一套清晰的智能体能力，帮你把想法变成可执行方案。从产品一页纸「单一产品」到课程逐字稿「多方法论」，少走弯路，稳定交付。
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -136,7 +136,7 @@ export default function HomePageClient({ user }: Props) {
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-4">
                   <div className="text-xs font-semibold text-slate-700">
-                    课程逐字稿
+                    课程逐字稿「多方法论」
                   </div>
                   <div className="mt-1 text-sm text-slate-600">
                     讲给用户听的版本：更顺、更清晰、更有节奏

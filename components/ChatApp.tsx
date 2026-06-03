@@ -2333,7 +2333,7 @@ export default function ChatApp(props: Props) {
       if (slug === "four-things") return "四件事";
       if (slug === "nine-grid") return "九宫格";
       if (slug === "course-outline") return COURSE_OUTLINE_AGENT_NAME;
-      if (slug === "course-transcript") return "课程";
+      if (slug === "course-transcript") return "课程逐字稿「多方法论」";
       if (slug === "material-tagging-assistant") return "素材标记";
       if (slug === "deterministic-material-capture-assistant") return "确定性素材抓取";
       if (slug === "crisis-material-capture-assistant") return "危机素材抓取";

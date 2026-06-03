@@ -34,6 +34,12 @@ const POSITIONING_HELPER_AGENT_NAME_ALIASES = [
   "定位助手",
   "定位"
 ];
+const COURSE_TRANSCRIPT_AGENT_NAME = "课程逐字稿「多方法论」";
+const COURSE_TRANSCRIPT_AGENT_NAME_ALIASES = [
+  COURSE_TRANSCRIPT_AGENT_NAME,
+  "课程逐字稿",
+  "课程"
+];
 
 function normalizeAgentNameForDisplay(agentName: string) {
   if (PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.includes(agentName)) {
@@ -44,6 +50,9 @@ function normalizeAgentNameForDisplay(agentName: string) {
   }
   if (POSITIONING_HELPER_AGENT_NAME_ALIASES.includes(agentName)) {
     return POSITIONING_HELPER_AGENT_NAME;
+  }
+  if (COURSE_TRANSCRIPT_AGENT_NAME_ALIASES.includes(agentName)) {
+    return COURSE_TRANSCRIPT_AGENT_NAME;
   }
   return agentName;
 }
@@ -105,6 +114,11 @@ export async function GET(request: Request) {
         `agent_name IN (${POSITIONING_HELPER_AGENT_NAME_ALIASES.map(() => "?").join(", ")})`
       );
       params.push(...POSITIONING_HELPER_AGENT_NAME_ALIASES);
+    } else if (COURSE_TRANSCRIPT_AGENT_NAME_ALIASES.includes(agentName)) {
+      conditions.push(
+        `agent_name IN (${COURSE_TRANSCRIPT_AGENT_NAME_ALIASES.map(() => "?").join(", ")})`
+      );
+      params.push(...COURSE_TRANSCRIPT_AGENT_NAME_ALIASES);
     } else {
       conditions.push("agent_name LIKE ?");
       params.push(`%${agentName}%`);

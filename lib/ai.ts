@@ -874,7 +874,7 @@ export function buildCourseTranscriptPrompt(content: string) {
     }
   }
 
-  return `你现在要扩写的是“课程逐字稿”。
+  return `你现在要扩写的是“课程逐字稿「多方法论」”。
 
 根据输入的定位信息${dingwei}，产品信息${chanpin}、四件事儿${shijianshi}、九宫格${jiugongge}、四件事和九宫格的关系${guanxi}，按照本节产品课程大纲（带12步结构）${kegang}的内容框架，扩写成一个60分钟的课程话术稿。
 
