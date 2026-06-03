@@ -37,6 +37,7 @@ const DISPLAY_ORDER = [
   "guixin-transaction",
   "course-outline-single-methodology",
   "course-outline",
+  "course-transcript-single-methodology",
   "course-transcript",
   "material-tagging-assistant",
   "deterministic-material-capture-assistant",

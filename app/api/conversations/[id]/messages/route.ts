@@ -23,6 +23,7 @@ const AI_AGENT_SLUGS = new Set([
   "four-things",
   "nine-grid",
   "course-outline",
+  "course-transcript-single-methodology",
   "course-transcript",
   "material-tagging-assistant",
   "deterministic-material-capture-assistant",

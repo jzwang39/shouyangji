@@ -599,6 +599,7 @@ function isCourseTranscriptAgent(agent: Agent | null | undefined) {
   const slug = normalizeAgentSlug(agent.slug);
   if (
     slug === "course-transcript" ||
+    slug === "course-transcript-single-methodology" ||
     slug === "coursetranscript" ||
     slug === "course_transcript"
   ) {
@@ -2333,6 +2334,7 @@ export default function ChatApp(props: Props) {
       if (slug === "four-things") return "四件事";
       if (slug === "nine-grid") return "九宫格";
       if (slug === "course-outline") return COURSE_OUTLINE_AGENT_NAME;
+      if (slug === "course-transcript-single-methodology") return "课程逐字稿「单方法论」";
       if (slug === "course-transcript") return "课程逐字稿「多方法论」";
       if (slug === "material-tagging-assistant") return "素材标记";
       if (slug === "deterministic-material-capture-assistant") return "确定性素材抓取";
