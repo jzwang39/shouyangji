@@ -66,6 +66,7 @@ type Props = {
 
 const PRODUCT_ONE_PAGER_AGENT_NAME = "产品一页纸「单一产品」";
 const COURSE_OUTLINE_AGENT_NAME = "课纲助手「多方法论」";
+const COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME = "课纲助手「单方法论」";
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -594,6 +595,22 @@ function isCourseOutlineAgent(agent: Agent | null | undefined) {
   return name.includes("课纲助手") || name === "课纲";
 }
 
+function isCourseOutlineSingleMethodologyAgent(
+  agent: Agent | null | undefined
+) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "course-outline-single-methodology" ||
+    slug === "courseoutlinesinglemethodology" ||
+    slug === "course_outline_single_methodology"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("课纲助手") && name.includes("单方法论");
+}
+
 function isCourseTranscriptAgent(agent: Agent | null | undefined) {
   if (!agent) return false;
   const slug = normalizeAgentSlug(agent.slug);
@@ -607,6 +624,22 @@ function isCourseTranscriptAgent(agent: Agent | null | undefined) {
   }
   const name = String(agent.name ?? "");
   return name.includes("课程逐字稿") || name.includes("逐字稿");
+}
+
+function isCourseTranscriptSingleMethodologyAgent(
+  agent: Agent | null | undefined
+) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "course-transcript-single-methodology" ||
+    slug === "coursetranscriptsinglemethodology" ||
+    slug === "course_transcript_single_methodology"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("课程逐字稿") && name.includes("单方法论");
 }
 
 function isMaterialTaggingAgent(agent: Agent | null | undefined) {
@@ -994,6 +1027,7 @@ export default function ChatApp(props: Props) {
     positioningContent?: string;
     fourThingsContent?: string;
     nineGridContent?: string;
+    guixinTransactionContent?: string;
     courseOutlineContent?: string;
     currentLesson?: string;
     currentLessonOutline?: string;
@@ -1387,12 +1421,18 @@ export default function ChatApp(props: Props) {
               | "content"
               | "fourThingsContent"
               | "nineGridContent"
+              | "guixinTransactionContent"
               | "courseOutlineContent"
               | "positioningContent"
               | "materialTaggingContent";
             agentName: string;
           }[] =
-            isCourseOutlineAgent(currentAgent)
+            isCourseOutlineSingleMethodologyAgent(currentAgent)
+              ? [
+                  { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
+                  { key: "guixinTransactionContent", agentName: "归心成交" }
+                ]
+              : isCourseOutlineAgent(currentAgent)
               ? [
                   { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
                   { key: "fourThingsContent", agentName: "四件事" },
@@ -1401,9 +1441,25 @@ export default function ChatApp(props: Props) {
               : isCourseTranscriptAgent(currentAgent)
               ? [
                   { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
-                  { key: "fourThingsContent", agentName: "四件事" },
-                  { key: "nineGridContent", agentName: "九宫格" },
-                  { key: "courseOutlineContent", agentName: COURSE_OUTLINE_AGENT_NAME }
+                  ...(isCourseTranscriptSingleMethodologyAgent(currentAgent)
+                    ? [
+                        {
+                          key: "guixinTransactionContent" as const,
+                          agentName: "归心成交"
+                        },
+                        {
+                          key: "courseOutlineContent" as const,
+                          agentName: COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME
+                        }
+                      ]
+                    : [
+                        { key: "fourThingsContent" as const, agentName: "四件事" },
+                        { key: "nineGridContent" as const, agentName: "九宫格" },
+                        {
+                          key: "courseOutlineContent" as const,
+                          agentName: COURSE_OUTLINE_AGENT_NAME
+                        }
+                      ])
                 ]
               : isFourThingsAgent(currentAgent) || isNineGridAgent(currentAgent)
               ? [
@@ -2425,6 +2481,7 @@ export default function ChatApp(props: Props) {
       content: "",
       fourThingsContent: "",
       nineGridContent: "",
+      guixinTransactionContent: "",
       courseOutlineContent: "",
       currentLesson: "",
       currentLessonOutline: "",
@@ -3433,44 +3490,68 @@ export default function ChatApp(props: Props) {
                           }
                         />
                       </div>
-                      <div>
-                        <label className="mb-1 block text-[11px] text-slate-600">
-                          四件事结果内容
-                        </label>
-                        <textarea
-                          className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                          value={referenceForm.fourThingsContent ?? ""}
-                          onChange={(event) =>
-                            setReferenceForm((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    fourThingsContent: event.target.value
-                                  }
-                                : prev
-                            )
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[11px] text-slate-600">
-                          九宫格结果内容
-                        </label>
-                        <textarea
-                          className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                          value={referenceForm.nineGridContent ?? ""}
-                          onChange={(event) =>
-                            setReferenceForm((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    nineGridContent: event.target.value
-                                  }
-                                : prev
-                            )
-                          }
-                        />
-                      </div>
+                      {isCourseOutlineSingleMethodologyAgent(currentAgent) ? (
+                        <div>
+                          <label className="mb-1 block text-[11px] text-slate-600">
+                            归心成交
+                          </label>
+                          <textarea
+                            className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            value={referenceForm.guixinTransactionContent ?? ""}
+                            onChange={(event) =>
+                              setReferenceForm((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      guixinTransactionContent: event.target.value
+                                    }
+                                  : prev
+                              )
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="mb-1 block text-[11px] text-slate-600">
+                              四件事结果内容
+                            </label>
+                            <textarea
+                              className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                              value={referenceForm.fourThingsContent ?? ""}
+                              onChange={(event) =>
+                                setReferenceForm((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        fourThingsContent: event.target.value
+                                      }
+                                    : prev
+                                )
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[11px] text-slate-600">
+                              九宫格结果内容
+                            </label>
+                            <textarea
+                              className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                              value={referenceForm.nineGridContent ?? ""}
+                              onChange={(event) =>
+                                setReferenceForm((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        nineGridContent: event.target.value
+                                      }
+                                    : prev
+                                )
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
                           课纲规则
@@ -3558,47 +3639,73 @@ export default function ChatApp(props: Props) {
                           }
                         />
                       </div>
+                      {isCourseTranscriptSingleMethodologyAgent(currentAgent) ? (
+                        <div>
+                          <label className="mb-1 block text-[11px] text-slate-600">
+                            归心成交
+                          </label>
+                          <textarea
+                            className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            value={referenceForm.guixinTransactionContent ?? ""}
+                            onChange={(event) =>
+                              setReferenceForm((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      guixinTransactionContent: event.target.value
+                                    }
+                                  : prev
+                              )
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="mb-1 block text-[11px] text-slate-600">
+                              四件事结果内容
+                            </label>
+                            <textarea
+                              className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                              value={referenceForm.fourThingsContent ?? ""}
+                              onChange={(event) =>
+                                setReferenceForm((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        fourThingsContent: event.target.value
+                                      }
+                                    : prev
+                                )
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[11px] text-slate-600">
+                              九宫格结果内容
+                            </label>
+                            <textarea
+                              className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                              value={referenceForm.nineGridContent ?? ""}
+                              onChange={(event) =>
+                                setReferenceForm((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        nineGridContent: event.target.value
+                                      }
+                                    : prev
+                                )
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
-                          四件事结果内容
-                        </label>
-                        <textarea
-                          className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                          value={referenceForm.fourThingsContent ?? ""}
-                          onChange={(event) =>
-                            setReferenceForm((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    fourThingsContent: event.target.value
-                                  }
-                                : prev
-                            )
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[11px] text-slate-600">
-                          九宫格结果内容
-                        </label>
-                        <textarea
-                          className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                          value={referenceForm.nineGridContent ?? ""}
-                          onChange={(event) =>
-                            setReferenceForm((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    nineGridContent: event.target.value
-                                  }
-                                : prev
-                            )
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[11px] text-slate-600">
-                          {COURSE_OUTLINE_AGENT_NAME}结果内容
+                          {isCourseTranscriptSingleMethodologyAgent(currentAgent)
+                            ? `${COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME}结果内容`
+                            : `${COURSE_OUTLINE_AGENT_NAME}结果内容`}
                         </label>
                         <textarea
                           className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -3638,16 +3745,18 @@ export default function ChatApp(props: Props) {
                           ))}
                         </select>
                       </div>
-                      <div>
-                        <label className="mb-1 block text-[11px] text-slate-600">
-                          四件事和九宫格对应关系
-                        </label>
-                        <textarea
-                          className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                          value={courseTranscriptFourThingsNineGridMapping}
-                          readOnly
-                        />
-                      </div>
+                      {isCourseTranscriptSingleMethodologyAgent(currentAgent) ? null : (
+                        <div>
+                          <label className="mb-1 block text-[11px] text-slate-600">
+                            四件事和九宫格对应关系
+                          </label>
+                          <textarea
+                            className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            value={courseTranscriptFourThingsNineGridMapping}
+                            readOnly
+                          />
+                        </div>
+                      )}
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
                           课纲当前第几节
@@ -3867,18 +3976,31 @@ export default function ChatApp(props: Props) {
                             if (isCourseOutlineAgent(currentAgent)) {
                               const sections: string[] = [];
                               const productContent = referenceForm.content.trim();
-                              const fourThings = (referenceForm.fourThingsContent ?? "").trim();
-                              const nineGrid = (referenceForm.nineGridContent ?? "").trim();
                               if (productContent) {
                                 sections.push(
                                   `产品信息\n${productContent}`
                                 );
                               }
-                              if (fourThings) {
-                                sections.push(`四件事\n${fourThings}`);
-                              }
-                              if (nineGrid) {
-                                sections.push(`九宫格\n${nineGrid}`);
+                              if (isCourseOutlineSingleMethodologyAgent(currentAgent)) {
+                                const guixinTransactionContent = (
+                                  referenceForm.guixinTransactionContent ?? ""
+                                ).trim();
+                                if (guixinTransactionContent) {
+                                  sections.push(`归心成交\n${guixinTransactionContent}`);
+                                }
+                              } else {
+                                const fourThings = (
+                                  referenceForm.fourThingsContent ?? ""
+                                ).trim();
+                                const nineGrid = (
+                                  referenceForm.nineGridContent ?? ""
+                                ).trim();
+                                if (fourThings) {
+                                  sections.push(`四件事\n${fourThings}`);
+                                }
+                                if (nineGrid) {
+                                  sections.push(`九宫格\n${nineGrid}`);
+                                }
                               }
                               const lessonCount = (
                                 referenceForm.courseLessonCount ?? ""
@@ -3896,18 +4018,31 @@ export default function ChatApp(props: Props) {
                             } else {
                                 const sections: string[] = [];
                                 const productContent = referenceForm.content.trim();
-                                const fourThings = (referenceForm.fourThingsContent ?? "").trim();
-                                const nineGrid = (referenceForm.nineGridContent ?? "").trim();
                                 if (productContent) {
                                   sections.push(
                                     `产品信息\n${productContent}`
                                   );
                                 }
-                                if (fourThings) {
-                                  sections.push(`四件事\n${fourThings}`);
-                                }
-                                if (nineGrid) {
-                                  sections.push(`九宫格\n${nineGrid}`);
+                                if (isCourseTranscriptSingleMethodologyAgent(currentAgent)) {
+                                  const guixinTransactionContent = (
+                                    referenceForm.guixinTransactionContent ?? ""
+                                  ).trim();
+                                  if (guixinTransactionContent) {
+                                    sections.push(`归心成交\n${guixinTransactionContent}`);
+                                  }
+                                } else {
+                                  const fourThings = (
+                                    referenceForm.fourThingsContent ?? ""
+                                  ).trim();
+                                  const nineGrid = (
+                                    referenceForm.nineGridContent ?? ""
+                                  ).trim();
+                                  if (fourThings) {
+                                    sections.push(`四件事\n${fourThings}`);
+                                  }
+                                  if (nineGrid) {
+                                    sections.push(`九宫格\n${nineGrid}`);
+                                  }
                                 }
                                 text = sections.join("\n\n");
                             }
@@ -3917,7 +4052,10 @@ export default function ChatApp(props: Props) {
                             const mapping = courseTranscriptFourThingsNineGridMapping.trim();
                             const currentOutline = courseTranscriptCurrentLessonOutline.trim();
                             const previousOutline = courseTranscriptPreviousLessonOutline.trim();
-                            if (mapping) {
+                            if (
+                              !isCourseTranscriptSingleMethodologyAgent(currentAgent) &&
+                              mapping
+                            ) {
                               extraSections.push(
                                 `四件事和九宫格关系\n${mapping}`
                               );
