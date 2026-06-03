@@ -80,10 +80,45 @@ export async function GET(request: Request) {
   const userId = Number((session.user as any).id);
   const userRole = String((session.user as any).role ?? "");
   const isSuperAdmin = userRole === "super_admin";
+  const ownershipCondition = isSuperAdmin ? "" : " AND operator_user_id = ?";
+  const ownershipParams = isSuperAdmin ? [] : [userId];
   const url = new URL(request.url);
   const productName = url.searchParams.get("productName");
   const agentName = url.searchParams.get("agentName");
   const lessonCountRaw = url.searchParams.get("lessonCount");
+  const queryType = url.searchParams.get("queryType");
+  
+  // 查询定位信息「单一产品」
+  if (queryType === "positioning" && productName) {
+    const positioningAgentNameCandidates = getAgentNameCandidates(
+      POSITIONING_HELPER_AGENT_NAME
+    );
+    const placeholders = positioningAgentNameCandidates.map(() => "?").join(", ");
+    
+    const rows = await query<AgentResultRow>(
+      `SELECT id, product_name, agent_name, lesson_count, operator_user_id, operator_name, result_content, created_at, updated_at
+       FROM agent_results
+       WHERE product_name = ? AND agent_name IN (${placeholders})${ownershipCondition}
+       ORDER BY lesson_count ASC, FIELD(agent_name, ${placeholders})
+       LIMIT 1`,
+      [
+        productName,
+        ...positioningAgentNameCandidates,
+        ...ownershipParams,
+        ...positioningAgentNameCandidates
+      ]
+    );
+    
+    if (!rows.length) {
+      return NextResponse.json({ positioningContent: "" });
+    }
+    
+    const row = rows[0];
+    return NextResponse.json({
+      positioningContent: row.result_content
+    });
+  }
+  
   if (productName && agentName && lessonCountRaw !== null) {
     const lessonCount = Number(lessonCountRaw);
     if (!Number.isFinite(lessonCount) || lessonCount < 0) {
@@ -96,14 +131,14 @@ export async function GET(request: Request) {
     const rows = await query<AgentResultRow>(
       `SELECT id, product_name, agent_name, lesson_count, operator_user_id, operator_name, result_content, created_at, updated_at
        FROM agent_results
-       WHERE product_name = ? AND agent_name IN (${placeholders}) AND lesson_count = ? AND operator_user_id = ?
+       WHERE product_name = ? AND agent_name IN (${placeholders}) AND lesson_count = ?${ownershipCondition}
        ORDER BY FIELD(agent_name, ${placeholders})
        LIMIT 1`,
       [
         productName,
         ...agentNameCandidates,
         lessonCount,
-        userId,
+        ...ownershipParams,
         ...agentNameCandidates
       ]
     );
@@ -129,10 +164,15 @@ export async function GET(request: Request) {
     const rows = await query<AgentResultRow>(
       `SELECT id, product_name, agent_name, lesson_count, operator_user_id, operator_name, result_content, created_at, updated_at
        FROM agent_results
-       WHERE product_name = ? AND agent_name IN (${placeholders}) AND operator_user_id = ?
+       WHERE product_name = ? AND agent_name IN (${placeholders})${ownershipCondition}
        ORDER BY lesson_count ASC, FIELD(agent_name, ${placeholders})
        LIMIT 1`,
-      [productName, ...agentNameCandidates, userId, ...agentNameCandidates]
+      [
+        productName,
+        ...agentNameCandidates,
+        ...ownershipParams,
+        ...agentNameCandidates
+      ]
     );
     if (!rows.length) {
       return NextResponse.json(null);

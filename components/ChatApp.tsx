@@ -693,6 +693,20 @@ function isExperimentDesignAgent(agent: Agent | null | undefined) {
   return name.includes("实验设计助手") || name.includes("实验设计");
 }
 
+function isGuixinTransactionAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "guixin-transaction" ||
+    slug === "guixintransaction" ||
+    slug === "guixin_transaction"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name.includes("归心成交");
+}
+
 function isAnyMaterialCaptureAgent(agent: Agent | null | undefined) {
   return (
     isDeterministicMaterialCaptureAgent(agent) ||
@@ -1365,6 +1379,7 @@ export default function ChatApp(props: Props) {
           isCourseTranscriptAgent(currentAgent) ||
           isFourThingsAgent(currentAgent) ||
           isNineGridAgent(currentAgent) ||
+          isGuixinTransactionAgent(currentAgent) ||
           isAnyMaterialCaptureAgent(currentAgent)
         ) {
           const queries: {
@@ -1394,6 +1409,14 @@ export default function ChatApp(props: Props) {
               ? [
                   { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
                   { key: "positioningContent", agentName: "定位" }
+                ]
+              : isGuixinTransactionAgent(currentAgent)
+              ? [
+                  { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
+                  {
+                    key: "positioningContent",
+                    agentName: "定位助手「单一产品」"
+                  }
                 ]
               : isAnyMaterialCaptureAgent(currentAgent)
               ? [
@@ -2333,6 +2356,7 @@ export default function ChatApp(props: Props) {
       if (slug === "positioning-helper") return "定位助手「单一产品」";
       if (slug === "four-things") return "四件事";
       if (slug === "nine-grid") return "九宫格";
+      if (slug === "guixin-transaction") return "归心成交";
       if (slug === "course-outline") return COURSE_OUTLINE_AGENT_NAME;
       if (slug === "course-transcript-single-methodology") return "课程逐字稿「单方法论」";
       if (slug === "course-transcript") return "课程逐字稿「多方法论」";
@@ -2391,6 +2415,7 @@ export default function ChatApp(props: Props) {
         !isNineGridAgent(currentAgent) &&
         !isCourseOutlineAgent(currentAgent) &&
         !isCourseTranscriptAgent(currentAgent) &&
+        !isGuixinTransactionAgent(currentAgent) &&
         !isAnyMaterialCaptureAgent(currentAgent))
     ) {
       return;
@@ -3184,7 +3209,8 @@ export default function ChatApp(props: Props) {
                                   currentAgent?.slug === "four-things" ||
                                   currentAgent?.slug === "product-one-pager" ||
                                   currentAgent?.slug === "course-outline" ||
-                                  currentAgent?.slug === "material-tagging-assistant") ? (
+                                  currentAgent?.slug === "material-tagging-assistant" ||
+                                  isGuixinTransactionAgent(currentAgent)) ? (
                                   <button
                                     type="button"
                                     className="hover:text-slate-700 transition-colors"
@@ -3263,6 +3289,7 @@ export default function ChatApp(props: Props) {
                       isNineGridAgent(currentAgent) ||
                       isCourseOutlineAgent(currentAgent) ||
                       isCourseTranscriptAgent(currentAgent) ||
+                      isGuixinTransactionAgent(currentAgent) ||
                       isAnyMaterialCaptureAgent(currentAgent)) ? (
                       <button
                         type="button"
@@ -3664,6 +3691,100 @@ export default function ChatApp(props: Props) {
                         />
                       </div>
                     </>
+                  ) : isGuixinTransactionAgent(currentAgent) ? (
+                    <>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-600">
+                          产品名称
+                        </label>
+                        <input
+                          list="product-name-options"
+                          className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                          value={referenceForm.productName}
+                          onChange={async (event) => {
+                            const newProductName = event.target.value;
+                            setReferenceForm((prev) =>
+                              prev
+                                ? { ...prev, productName: newProductName }
+                                : prev
+                            );
+                            
+                            // 如果产品名称不为空，查询对应的产品一页纸信息和定位信息
+                             if (newProductName.trim()) {
+                               try {
+                                 // 查询产品一页纸「单一产品」信息
+                                 const productRes = await fetch(`/api/results?productName=${encodeURIComponent(newProductName)}&agentName=${encodeURIComponent(PRODUCT_ONE_PAGER_AGENT_NAME)}`);
+                                 if (productRes.ok) {
+                                   const productData = await productRes.json();
+                                   if (productData && productData.resultContent) {
+                                     setReferenceForm((prev) =>
+                                       prev
+                                         ? { ...prev, content: productData.resultContent }
+                                         : prev
+                                     );
+                                   }
+                                 }
+                                 
+                                 // 查询定位信息「单一产品」
+                                 const positioningRes = await fetch(`/api/results?queryType=positioning&productName=${encodeURIComponent(newProductName)}`);
+                                 if (positioningRes.ok) {
+                                   const positioningData = await positioningRes.json();
+                                   if (positioningData.positioningContent) {
+                                     setReferenceForm((prev) =>
+                                       prev
+                                         ? { ...prev, positioningContent: positioningData.positioningContent }
+                                         : prev
+                                     );
+                                   }
+                                 }
+                               } catch (error) {
+                                 console.error("查询产品信息失败:", error);
+                               }
+                             }
+                          }}
+                        />
+                        <datalist id="product-name-options">
+                          {productNameOptions.map((name) => (
+                            <option key={name} value={name} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-600">
+                          {PRODUCT_ONE_PAGER_AGENT_NAME}信息
+                        </label>
+                        <textarea
+                          className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                          value={referenceForm.content}
+                          onChange={(event) =>
+                            setReferenceForm((prev) =>
+                              prev
+                                ? { ...prev, content: event.target.value }
+                                : prev
+                            )
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-600">
+                          定位信息「单一产品」
+                        </label>
+                        <textarea
+                          className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                          value={referenceForm.positioningContent ?? ""}
+                          onChange={(event) =>
+                            setReferenceForm((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    positioningContent: event.target.value
+                                  }
+                                : prev
+                            )
+                          }
+                        />
+                      </div>
+                    </>
                   ) : (
                     <>
                       <div>
@@ -3821,6 +3942,26 @@ export default function ChatApp(props: Props) {
                                   : extraSections.join("\n\n");
                             }
                           }
+                          if (isGuixinTransactionAgent(currentAgent)) {
+                            const sections: string[] = [];
+                            const productName = referenceForm.productName.trim();
+                            const productContent = referenceForm.content.trim();
+                            const positioningContent = (referenceForm.positioningContent ?? "").trim();
+                            
+                            if (productName) {
+                              sections.push(`产品名称：${productName}`);
+                            }
+                            if (productContent) {
+                              sections.push(`${PRODUCT_ONE_PAGER_AGENT_NAME}信息：\n${productContent}`);
+                            }
+                            if (positioningContent) {
+                              sections.push(`定位信息：\n${positioningContent}`);
+                            }
+                            
+                            if (sections.length > 0) {
+                              text = sections.join("\n\n");
+                            }
+                          }
                           if (isAnyMaterialCaptureAgent(currentAgent)) {
                             const materialTaggingContent = (
                               referenceForm.materialTaggingContent ?? ""
@@ -3919,6 +4060,7 @@ export default function ChatApp(props: Props) {
                       <option value="定位">定位</option>
                       <option value="四件事">四件事</option>
                       <option value="九宫格">九宫格</option>
+                      <option value="归心成交">归心成交</option>
                       <option value={COURSE_OUTLINE_AGENT_NAME}>
                         {COURSE_OUTLINE_AGENT_NAME}
                       </option>

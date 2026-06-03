@@ -22,6 +22,7 @@ const AI_AGENT_SLUGS = new Set([
   "product-one-pager",
   "four-things",
   "nine-grid",
+  "guixin-transaction",
   "course-outline",
   "course-transcript-single-methodology",
   "course-transcript",
@@ -108,6 +109,7 @@ function isAiAgent(slug: string, agentName: string) {
     name.includes("定位") ||
     name.includes("四件事") ||
     name.includes("九宫格") ||
+    name.includes("归心成交") ||
     name.includes("课纲") ||
     name.includes("课程") ||
     name.includes("实验设计") ||
