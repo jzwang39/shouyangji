@@ -34,10 +34,14 @@ const POSITIONING_HELPER_AGENT_NAME_ALIASES = [
   "定位"
 ];
 const COURSE_TRANSCRIPT_AGENT_NAME = "课程逐字稿「多方法论」";
+const COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME = "课程逐字稿「单方法论」";
 const COURSE_TRANSCRIPT_AGENT_NAME_ALIASES = [
   COURSE_TRANSCRIPT_AGENT_NAME,
   "课程逐字稿",
   "课程"
+];
+const COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES = [
+  COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME
 ];
 
 function normalizeAgentNameForStorage(agentName: string) {
@@ -52,6 +56,11 @@ function normalizeAgentNameForStorage(agentName: string) {
   }
   if (COURSE_TRANSCRIPT_AGENT_NAME_ALIASES.includes(agentName)) {
     return COURSE_TRANSCRIPT_AGENT_NAME;
+  }
+  if (
+    COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES.includes(agentName)
+  ) {
+    return COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME;
   }
   return agentName;
 }
@@ -68,6 +77,11 @@ function getAgentNameCandidates(agentName: string) {
   }
   if (COURSE_TRANSCRIPT_AGENT_NAME_ALIASES.includes(agentName)) {
     return COURSE_TRANSCRIPT_AGENT_NAME_ALIASES;
+  }
+  if (
+    COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES.includes(agentName)
+  ) {
+    return COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES;
   }
   return [agentName];
 }

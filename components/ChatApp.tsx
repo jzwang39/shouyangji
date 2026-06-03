@@ -67,6 +67,8 @@ type Props = {
 const PRODUCT_ONE_PAGER_AGENT_NAME = "产品一页纸「单一产品」";
 const COURSE_OUTLINE_AGENT_NAME = "课纲助手「多方法论」";
 const COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME = "课纲助手「单方法论」";
+const COURSE_TRANSCRIPT_AGENT_NAME = "课程逐字稿「多方法论」";
+const COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME = "课程逐字稿「单方法论」";
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -862,7 +864,7 @@ function parseChineseLessonNumber(value: string) {
 function getCourseOutlineLessonMatches(text: string) {
   const source = String(text ?? "");
   const regex =
-    /^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:\d+\s*[.、]\s*)?第\s*([0-9一二三四五六七八九十两〇零]+)\s*(?:节|课)(?:课)?(?:\*\*)?\s*[：:：\-—]?.*$/gm;
+    /^\s*(?:\|+\s*)?(?:#{1,6}\s*)?(?:\*\*)?(?:\d+\s*[.、]\s*)?第\s*([0-9一二三四五六七八九十两〇零]+)\s*(?:节|课)(?:课)?(?:\*\*)?(?:\s*\||\s*[：:：\-—])?.*$/gm;
   return Array.from(source.matchAll(regex)).filter((match) => {
     const value = parseChineseLessonNumber(match[1]);
     return Number.isFinite(value) && value > 0;
@@ -1154,7 +1156,7 @@ export default function ChatApp(props: Props) {
     }
     const text = referenceForm.courseOutlineContent;
     const lessonNumbers = getCourseOutlineLessonMatches(text)
-      .map((match) => Number(match[1]))
+      .map((match) => parseChineseLessonNumber(match[1]))
       .filter((value) => Number.isFinite(value) && value > 0);
     let count = lessonNumbers.length > 0 ? Math.max(...lessonNumbers) : 0;
     if (count <= 0) {
@@ -2427,8 +2429,10 @@ export default function ChatApp(props: Props) {
         return COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME;
       }
       if (slug === "course-outline") return COURSE_OUTLINE_AGENT_NAME;
-      if (slug === "course-transcript-single-methodology") return "课程逐字稿「单方法论」";
-      if (slug === "course-transcript") return "课程逐字稿「多方法论」";
+      if (slug === "course-transcript-single-methodology") {
+        return COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME;
+      }
+      if (slug === "course-transcript") return COURSE_TRANSCRIPT_AGENT_NAME;
       if (slug === "material-tagging-assistant") return "素材标记";
       if (slug === "deterministic-material-capture-assistant") return "确定性素材抓取";
       if (slug === "crisis-material-capture-assistant") return "危机素材抓取";
@@ -3280,6 +3284,8 @@ export default function ChatApp(props: Props) {
                                   currentAgent?.slug === "product-one-pager" ||
                                   currentAgent?.slug === "course-outline-single-methodology" ||
                                   currentAgent?.slug === "course-outline" ||
+                                  currentAgent?.slug === "course-transcript-single-methodology" ||
+                                  currentAgent?.slug === "course-transcript" ||
                                   currentAgent?.slug === "material-tagging-assistant" ||
                                   isGuixinTransactionAgent(currentAgent)) ? (
                                   <button
@@ -4218,6 +4224,12 @@ export default function ChatApp(props: Props) {
                       </option>
                       <option value={COURSE_OUTLINE_AGENT_NAME}>
                         {COURSE_OUTLINE_AGENT_NAME}
+                      </option>
+                      <option value={COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME}>
+                        {COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME}
+                      </option>
+                      <option value={COURSE_TRANSCRIPT_AGENT_NAME}>
+                        {COURSE_TRANSCRIPT_AGENT_NAME}
                       </option>
                       <option value="课程">课程</option>
                       <option value="素材标记">素材标记</option>
