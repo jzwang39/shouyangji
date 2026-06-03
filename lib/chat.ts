@@ -34,6 +34,8 @@ const DISPLAY_ORDER = [
   "positioning-helper",
   "four-things",
   "nine-grid",
+  "guixin-transaction",
+  "course-outline-single-methodology",
   "course-outline",
   "course-transcript",
   "material-tagging-assistant",
