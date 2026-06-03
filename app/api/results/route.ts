@@ -27,6 +27,12 @@ const COURSE_OUTLINE_AGENT_NAME_ALIASES = [
   "课纲助手",
   "课纲"
 ];
+const POSITIONING_HELPER_AGENT_NAME = "定位助手「单一产品」";
+const POSITIONING_HELPER_AGENT_NAME_ALIASES = [
+  POSITIONING_HELPER_AGENT_NAME,
+  "定位助手",
+  "定位"
+];
 
 function normalizeAgentNameForStorage(agentName: string) {
   if (PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.includes(agentName)) {
@@ -34,6 +40,9 @@ function normalizeAgentNameForStorage(agentName: string) {
   }
   if (COURSE_OUTLINE_AGENT_NAME_ALIASES.includes(agentName)) {
     return COURSE_OUTLINE_AGENT_NAME;
+  }
+  if (POSITIONING_HELPER_AGENT_NAME_ALIASES.includes(agentName)) {
+    return POSITIONING_HELPER_AGENT_NAME;
   }
   return agentName;
 }
@@ -44,6 +53,9 @@ function getAgentNameCandidates(agentName: string) {
   }
   if (COURSE_OUTLINE_AGENT_NAME_ALIASES.includes(agentName)) {
     return COURSE_OUTLINE_AGENT_NAME_ALIASES;
+  }
+  if (POSITIONING_HELPER_AGENT_NAME_ALIASES.includes(agentName)) {
+    return POSITIONING_HELPER_AGENT_NAME_ALIASES;
   }
   return [agentName];
 }

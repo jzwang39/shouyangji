@@ -2329,7 +2329,7 @@ export default function ChatApp(props: Props) {
   const resolveAgentDisplayName = useCallback(
     (slug: string, fallback: string) => {
       if (slug === "product-one-pager") return PRODUCT_ONE_PAGER_AGENT_NAME;
-      if (slug === "positioning-helper") return "定位";
+      if (slug === "positioning-helper") return "定位助手「单一产品」";
       if (slug === "four-things") return "四件事";
       if (slug === "nine-grid") return "九宫格";
       if (slug === "course-outline") return COURSE_OUTLINE_AGENT_NAME;
