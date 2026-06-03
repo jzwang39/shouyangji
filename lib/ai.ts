@@ -1561,6 +1561,7 @@ function parseStructuredContent(content: string, customKeys?: { key: string; lab
   const normalized = content.trim();
   const defaultKeys = [
      { key: "chanpin", label: "产品信息" },
+     { key: "fangfalun", label: "方法论信息" },
      { key: "dingwei", label: "定位" },
      { key: "shijianshi", label: "四件事" },
      { key: "jiugongge", label: "九宫格" },
@@ -1688,6 +1689,16 @@ function looksLikeExperimentDesignProductInfo(content: string) {
 function buildPromptByTemplate(slug: string, template: string, content: string) {
   const { hasHeaders, result: parsedVars } = parseStructuredContent(content);
   console.log(`[Prompt Build] Slug: ${slug}, Has Headers: ${hasHeaders}, Keys found: ${Object.keys(parsedVars).filter(k => parsedVars[k]).join(", ")}`);
+  if (slug === "course-outline-single-methodology") {
+    return renderTemplate(template, {
+      ...parsedVars,
+      content,
+      chanpin: parsedVars.chanpin || "",
+      fangfalun: (parsedVars as any).fangfalun || "",
+      kegangjieshu: parsedVars.kegangjieshu || "",
+      kegangguize: parsedVars.kegangguize || ""
+    });
+  }
 
   if (slug === "course-outline") {
     if (hasHeaders) {

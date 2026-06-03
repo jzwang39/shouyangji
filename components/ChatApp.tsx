@@ -530,9 +530,19 @@ function isRevisionEnabledAgent(agent: Agent | null | undefined) {
   const slug = String(agent.slug ?? "")
     .trim()
     .toLowerCase();
+  if (
+    slug === "course-outline-single-methodology" ||
+    slug === "courseoutlinesinglemethodology" ||
+    slug === "course_outline_single_methodology"
+  ) {
+    return false;
+  }
   if (REVISION_ENABLED_SLUGS.has(slug)) return true;
   const name = String(agent.name ?? "").trim();
   if (!name) return false;
+  if (name.includes("课纲助手") && name.includes("单方法论")) {
+    return false;
+  }
   return (
     name.includes("定位") ||
     name.includes("四件事") ||
@@ -2413,6 +2423,9 @@ export default function ChatApp(props: Props) {
       if (slug === "four-things") return "四件事";
       if (slug === "nine-grid") return "九宫格";
       if (slug === "guixin-transaction") return "归心成交";
+      if (slug === "course-outline-single-methodology") {
+        return COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME;
+      }
       if (slug === "course-outline") return COURSE_OUTLINE_AGENT_NAME;
       if (slug === "course-transcript-single-methodology") return "课程逐字稿「单方法论」";
       if (slug === "course-transcript") return "课程逐字稿「多方法论」";
@@ -3265,6 +3278,7 @@ export default function ChatApp(props: Props) {
                                   currentAgent?.slug === "positioning-helper" ||
                                   currentAgent?.slug === "four-things" ||
                                   currentAgent?.slug === "product-one-pager" ||
+                                  currentAgent?.slug === "course-outline-single-methodology" ||
                                   currentAgent?.slug === "course-outline" ||
                                   currentAgent?.slug === "material-tagging-assistant" ||
                                   isGuixinTransactionAgent(currentAgent)) ? (
@@ -3986,7 +4000,7 @@ export default function ChatApp(props: Props) {
                                   referenceForm.guixinTransactionContent ?? ""
                                 ).trim();
                                 if (guixinTransactionContent) {
-                                  sections.push(`归心成交\n${guixinTransactionContent}`);
+                                  sections.push(`方法论信息\n${guixinTransactionContent}`);
                                 }
                               } else {
                                 const fourThings = (
@@ -4199,6 +4213,9 @@ export default function ChatApp(props: Props) {
                       <option value="四件事">四件事</option>
                       <option value="九宫格">九宫格</option>
                       <option value="归心成交">归心成交</option>
+                      <option value={COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME}>
+                        {COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME}
+                      </option>
                       <option value={COURSE_OUTLINE_AGENT_NAME}>
                         {COURSE_OUTLINE_AGENT_NAME}
                       </option>

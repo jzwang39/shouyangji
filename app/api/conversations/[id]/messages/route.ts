@@ -125,9 +125,15 @@ function isAiAgent(slug: string, agentName: string) {
 
 function isRevisionEnabledAgent(slug: string, agentName: string) {
   const normalizedSlug = normalizeAgentSlug(slug);
+  if (normalizedSlug === "course-outline-single-methodology") {
+    return false;
+  }
   if (REVISION_ENABLED_SLUGS.has(normalizedSlug)) return true;
   const name = String(agentName ?? "").trim();
   if (!name) return false;
+  if (name.includes("课纲助手") && name.includes("单方法论")) {
+    return false;
+  }
   return (
     name.includes("定位") ||
     name.includes("四件事") ||
@@ -328,7 +334,6 @@ ${content}`
       
       console.log(`[API] promptContent长度: ${promptContent.length}`);
       console.log(`[API] promptOverride: ${promptOverride ? '有值，长度=' + promptOverride.length : '空'}`);
-      
       let prompt =
         promptOverride || (await buildPromptForAgent(conversation.slug, promptContent));
       let aiMessages:
