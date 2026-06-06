@@ -1405,8 +1405,13 @@ function getDefaultPromptTemplate(slug: string) {
   const normalized = normalizeAgentSlug(slug);
   console.log(`[getDefaultPromptTemplate] 被调用，slug: ${slug}, normalized: ${normalized}`);
   
-  if (normalized === "product-one-pager") {
-    console.log(`[getDefaultPromptTemplate] 返回 product-one-pager 默认模板`);
+  if (
+    normalized === "product-one-pager" ||
+    normalized === "product-one-pager-series"
+  ) {
+    console.log(
+      `[getDefaultPromptTemplate] 返回 ${normalized} 默认模板`
+    );
     return buildProductOnePagerPrompt("{{content}}");
   }
   if (normalized === "positioning-helper") {

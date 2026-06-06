@@ -23,6 +23,7 @@ const allowedSlugs = [
   "course-outline",
   "course-transcript-single-methodology",
   "course-transcript",
+  "product-one-pager-series",
   "material-tagging-assistant",
   "deterministic-material-capture-assistant",
   "crisis-material-capture-assistant",

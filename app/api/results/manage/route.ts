@@ -21,12 +21,21 @@ const PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES = [
   PRODUCT_ONE_PAGER_AGENT_NAME,
   "产品一页纸"
 ];
+const PRODUCT_ONE_PAGER_SERIES_AGENT_NAME = "产品一页纸「产品系列」";
+const PRODUCT_ONE_PAGER_SERIES_AGENT_NAME_ALIASES = [
+  PRODUCT_ONE_PAGER_SERIES_AGENT_NAME
+];
 const COURSE_OUTLINE_AGENT_NAME = "课纲助手「多方法论」";
 const COURSE_OUTLINE_AGENT_NAME_ALIASES = [
   COURSE_OUTLINE_AGENT_NAME,
   "课纲助手「单一产品」",
   "课纲助手",
   "课纲"
+];
+const COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME = "课纲助手「产品系列」";
+const COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES = [
+  COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME,
+  "课纲助手「单方法论」"
 ];
 const POSITIONING_HELPER_AGENT_NAME = "定位助手「单一产品」";
 const POSITIONING_HELPER_AGENT_NAME_ALIASES = [
@@ -40,19 +49,37 @@ const COURSE_TRANSCRIPT_AGENT_NAME_ALIASES = [
   "课程逐字稿",
   "课程"
 ];
+const COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME = "课程逐字稿「产品系列」";
+const COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES = [
+  COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME,
+  "课程逐字稿「单方法论」"
+];
 
 function normalizeAgentNameForDisplay(agentName: string) {
   if (PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.includes(agentName)) {
     return PRODUCT_ONE_PAGER_AGENT_NAME;
   }
+  if (PRODUCT_ONE_PAGER_SERIES_AGENT_NAME_ALIASES.includes(agentName)) {
+    return PRODUCT_ONE_PAGER_SERIES_AGENT_NAME;
+  }
   if (COURSE_OUTLINE_AGENT_NAME_ALIASES.includes(agentName)) {
     return COURSE_OUTLINE_AGENT_NAME;
+  }
+  if (
+    COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES.includes(agentName)
+  ) {
+    return COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME;
   }
   if (POSITIONING_HELPER_AGENT_NAME_ALIASES.includes(agentName)) {
     return POSITIONING_HELPER_AGENT_NAME;
   }
   if (COURSE_TRANSCRIPT_AGENT_NAME_ALIASES.includes(agentName)) {
     return COURSE_TRANSCRIPT_AGENT_NAME;
+  }
+  if (
+    COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES.includes(agentName)
+  ) {
+    return COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME;
   }
   return agentName;
 }
@@ -104,11 +131,25 @@ export async function GET(request: Request) {
         `agent_name IN (${PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES.map(() => "?").join(", ")})`
       );
       params.push(...PRODUCT_ONE_PAGER_AGENT_NAME_ALIASES);
+    } else if (
+      PRODUCT_ONE_PAGER_SERIES_AGENT_NAME_ALIASES.includes(agentName)
+    ) {
+      conditions.push(
+        `agent_name IN (${PRODUCT_ONE_PAGER_SERIES_AGENT_NAME_ALIASES.map(() => "?").join(", ")})`
+      );
+      params.push(...PRODUCT_ONE_PAGER_SERIES_AGENT_NAME_ALIASES);
     } else if (COURSE_OUTLINE_AGENT_NAME_ALIASES.includes(agentName)) {
       conditions.push(
         `agent_name IN (${COURSE_OUTLINE_AGENT_NAME_ALIASES.map(() => "?").join(", ")})`
       );
       params.push(...COURSE_OUTLINE_AGENT_NAME_ALIASES);
+    } else if (
+      COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES.includes(agentName)
+    ) {
+      conditions.push(
+        `agent_name IN (${COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES.map(() => "?").join(", ")})`
+      );
+      params.push(...COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES);
     } else if (POSITIONING_HELPER_AGENT_NAME_ALIASES.includes(agentName)) {
       conditions.push(
         `agent_name IN (${POSITIONING_HELPER_AGENT_NAME_ALIASES.map(() => "?").join(", ")})`
@@ -119,6 +160,13 @@ export async function GET(request: Request) {
         `agent_name IN (${COURSE_TRANSCRIPT_AGENT_NAME_ALIASES.map(() => "?").join(", ")})`
       );
       params.push(...COURSE_TRANSCRIPT_AGENT_NAME_ALIASES);
+    } else if (
+      COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES.includes(agentName)
+    ) {
+      conditions.push(
+        `agent_name IN (${COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES.map(() => "?").join(", ")})`
+      );
+      params.push(...COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME_ALIASES);
     } else {
       conditions.push("agent_name LIKE ?");
       params.push(`%${agentName}%`);

@@ -20,6 +20,7 @@ const AI_AGENT_SLUGS = new Set([
   "positioning-assistant",
   "position-helper",
   "product-one-pager",
+  "product-one-pager-series",
   "four-things",
   "nine-grid",
   "guixin-transaction",
@@ -131,7 +132,10 @@ function isRevisionEnabledAgent(slug: string, agentName: string) {
   if (REVISION_ENABLED_SLUGS.has(normalizedSlug)) return true;
   const name = String(agentName ?? "").trim();
   if (!name) return false;
-  if (name.includes("课纲助手") && name.includes("单方法论")) {
+  if (
+    name.includes("课纲助手") &&
+    (name.includes("单方法论") || name.includes("产品系列"))
+  ) {
     return false;
   }
   return (
@@ -342,6 +346,7 @@ ${content}`
 
       if (
         normalizedConversationSlug === "product-one-pager" ||
+        normalizedConversationSlug === "product-one-pager-series" ||
         isExperimentDesignConversation
       ) {
         const historyRows = await query<{

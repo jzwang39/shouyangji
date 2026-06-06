@@ -65,10 +65,11 @@ type Props = {
 };
 
 const PRODUCT_ONE_PAGER_AGENT_NAME = "产品一页纸「单一产品」";
+const PRODUCT_ONE_PAGER_SERIES_AGENT_NAME = "产品一页纸「产品系列」";
 const COURSE_OUTLINE_AGENT_NAME = "课纲助手「多方法论」";
-const COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME = "课纲助手「单方法论」";
+const COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME = "课纲助手「产品系列」";
 const COURSE_TRANSCRIPT_AGENT_NAME = "课程逐字稿「多方法论」";
-const COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME = "课程逐字稿「单方法论」";
+const COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME = "课程逐字稿「产品系列」";
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -542,7 +543,10 @@ function isRevisionEnabledAgent(agent: Agent | null | undefined) {
   if (REVISION_ENABLED_SLUGS.has(slug)) return true;
   const name = String(agent.name ?? "").trim();
   if (!name) return false;
-  if (name.includes("课纲助手") && name.includes("单方法论")) {
+  if (
+    name.includes("课纲助手") &&
+    (name.includes("单方法论") || name.includes("产品系列"))
+  ) {
     return false;
   }
   return (
@@ -620,7 +624,10 @@ function isCourseOutlineSingleMethodologyAgent(
     return true;
   }
   const name = String(agent.name ?? "");
-  return name.includes("课纲助手") && name.includes("单方法论");
+  return (
+    name.includes("课纲助手") &&
+    (name.includes("单方法论") || name.includes("产品系列"))
+  );
 }
 
 function isCourseTranscriptAgent(agent: Agent | null | undefined) {
@@ -651,7 +658,10 @@ function isCourseTranscriptSingleMethodologyAgent(
     return true;
   }
   const name = String(agent.name ?? "");
-  return name.includes("课程逐字稿") && name.includes("单方法论");
+  return (
+    name.includes("课程逐字稿") &&
+    (name.includes("单方法论") || name.includes("产品系列"))
+  );
 }
 
 function isMaterialTaggingAgent(agent: Agent | null | undefined) {
@@ -1441,8 +1451,10 @@ export default function ChatApp(props: Props) {
           }[] =
             isCourseOutlineSingleMethodologyAgent(currentAgent)
               ? [
-                  { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
-                  { key: "guixinTransactionContent", agentName: "归心成交" }
+                  {
+                    key: "content",
+                    agentName: PRODUCT_ONE_PAGER_SERIES_AGENT_NAME
+                  }
                 ]
               : isCourseOutlineAgent(currentAgent)
               ? [
@@ -1452,13 +1464,14 @@ export default function ChatApp(props: Props) {
                 ]
               : isCourseTranscriptAgent(currentAgent)
               ? [
-                  { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
+                  {
+                    key: "content",
+                    agentName: isCourseTranscriptSingleMethodologyAgent(currentAgent)
+                      ? PRODUCT_ONE_PAGER_SERIES_AGENT_NAME
+                      : PRODUCT_ONE_PAGER_AGENT_NAME
+                  },
                   ...(isCourseTranscriptSingleMethodologyAgent(currentAgent)
                     ? [
-                        {
-                          key: "guixinTransactionContent" as const,
-                          agentName: "归心成交"
-                        },
                         {
                           key: "courseOutlineContent" as const,
                           agentName: COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME
@@ -2421,6 +2434,9 @@ export default function ChatApp(props: Props) {
   const resolveAgentDisplayName = useCallback(
     (slug: string, fallback: string) => {
       if (slug === "product-one-pager") return PRODUCT_ONE_PAGER_AGENT_NAME;
+      if (slug === "product-one-pager-series") {
+        return PRODUCT_ONE_PAGER_SERIES_AGENT_NAME;
+      }
       if (slug === "positioning-helper") return "定位助手「单一产品」";
       if (slug === "four-things") return "四件事";
       if (slug === "nine-grid") return "九宫格";
@@ -2452,7 +2468,8 @@ export default function ChatApp(props: Props) {
       );
       const normalizedContent = stripPendingPrefix(message.content);
       const resultContent =
-        currentAgent.slug === "product-one-pager"
+        currentAgent.slug === "product-one-pager" ||
+        currentAgent.slug === "product-one-pager-series"
           ? extractProductOnePagerSaveContent(normalizedContent)
           : normalizedContent;
       const nowIso = new Date().toISOString();
@@ -2601,53 +2618,62 @@ export default function ChatApp(props: Props) {
               <div className="mb-3 text-[10px] font-semibold uppercase tracking-widest opacity-50">智能体</div>
               <div className="space-y-0.5">
                 {agents.map((agent) => (
-                  <button
-                    key={agent.id}
-                    type="button"
-                    disabled={sending}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
-                      activePanel === "chat" && selectedAgentId === agent.id
-                        ? "bg-sidebar-active font-medium"
-                        : "hover:bg-sidebar-hover"
-                    }`}
-                    onClick={() => handleSelectAgent(agent.id)}
-                  >
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <AgentMenuIcon slug={agent.slug} />
-                      <span className="truncate">{agent.name}</span>
-                    </span>
-                  </button>
+                  <div key={agent.id}>
+                    {agent.slug === "product-one-pager-series" ||
+                    agent.slug === "material-tagging-assistant" ||
+                    agent.slug === "experiment-design-assistant" ? (
+                      <div className="my-2 border-t border-sidebar-active/40" />
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={sending}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
+                        activePanel === "chat" && selectedAgentId === agent.id
+                          ? "bg-sidebar-active font-medium"
+                          : "hover:bg-sidebar-hover"
+                      }`}
+                      onClick={() => handleSelectAgent(agent.id)}
+                    >
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <AgentMenuIcon slug={agent.slug} />
+                        <span className="truncate">{agent.name}</span>
+                      </span>
+                    </button>
+                  </div>
                 ))}
                 {canAccessDataManagement ? (
-                  <button
-                    type="button"
-                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
-                      activePanel === "data-management"
-                        ? "bg-sidebar-active font-medium"
-                        : "hover:bg-sidebar-hover"
-                    }`}
-                    onClick={handleOpenDataManagement}
-                  >
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <svg
-                        className="h-4 w-4 shrink-0 opacity-80"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M4 5h16" />
-                        <path d="M4 12h16" />
-                        <path d="M4 19h16" />
-                        <path d="M8 3v4" />
-                        <path d="M16 10v4" />
-                        <path d="M12 17v4" />
-                      </svg>
-                      <span className="truncate">数据管理</span>
-                    </span>
-                  </button>
+                  <div>
+                    <div className="my-2 border-t border-sidebar-active/40" />
+                    <button
+                      type="button"
+                      className={`flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
+                        activePanel === "data-management"
+                          ? "bg-sidebar-active font-medium"
+                          : "hover:bg-sidebar-hover"
+                      }`}
+                      onClick={handleOpenDataManagement}
+                    >
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <svg
+                          className="h-4 w-4 shrink-0 opacity-80"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 5h16" />
+                          <path d="M4 12h16" />
+                          <path d="M4 19h16" />
+                          <path d="M8 3v4" />
+                          <path d="M16 10v4" />
+                          <path d="M12 17v4" />
+                        </svg>
+                        <span className="truncate">数据管理</span>
+                      </span>
+                    </button>
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -2841,53 +2867,62 @@ export default function ChatApp(props: Props) {
             <div className="mb-2 text-xs opacity-60">智能体</div>
             <div className="mb-4 flex flex-wrap gap-2">
               {agents.map((agent) => (
-                <button
-                  key={agent.id}
-                  type="button"
-                  disabled={sending}
-                  className={`rounded px-2 py-1 text-xs transition-colors ${
-                    activePanel === "chat" && selectedAgentId === agent.id
-                      ? "bg-sidebar-active"
-                      : "bg-sidebar-hover"
-                  }`}
-                  onClick={() => handleSelectAgent(agent.id)}
-                >
-                  <span className="flex items-center gap-1.5">
-                    <AgentMenuIcon slug={agent.slug} />
-                    <span className="truncate">{agent.name}</span>
-                  </span>
-                </button>
+                <div key={agent.id} className="contents">
+                  {agent.slug === "product-one-pager-series" ||
+                  agent.slug === "material-tagging-assistant" ||
+                  agent.slug === "experiment-design-assistant" ? (
+                    <div className="my-1 h-px w-full basis-full bg-sidebar-active/40" />
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={sending}
+                    className={`rounded px-2 py-1 text-xs transition-colors ${
+                      activePanel === "chat" && selectedAgentId === agent.id
+                        ? "bg-sidebar-active"
+                        : "bg-sidebar-hover"
+                    }`}
+                    onClick={() => handleSelectAgent(agent.id)}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <AgentMenuIcon slug={agent.slug} />
+                      <span className="truncate">{agent.name}</span>
+                    </span>
+                  </button>
+                </div>
               ))}
               {canAccessDataManagement ? (
-                <button
-                  type="button"
-                  className={`rounded px-2 py-1 text-xs transition-colors ${
-                    activePanel === "data-management"
-                      ? "bg-sidebar-active"
-                      : "bg-sidebar-hover"
-                  }`}
-                  onClick={handleOpenDataManagement}
-                >
-                  <span className="flex items-center gap-1.5">
-                    <svg
-                      className="h-4 w-4 shrink-0 opacity-80"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M4 5h16" />
-                      <path d="M4 12h16" />
-                      <path d="M4 19h16" />
-                      <path d="M8 3v4" />
-                      <path d="M16 10v4" />
-                      <path d="M12 17v4" />
-                    </svg>
-                    <span className="truncate">数据管理</span>
-                  </span>
-                </button>
+                <div className="contents">
+                  <div className="my-1 h-px w-full basis-full bg-sidebar-active/40" />
+                  <button
+                    type="button"
+                    className={`rounded px-2 py-1 text-xs transition-colors ${
+                      activePanel === "data-management"
+                        ? "bg-sidebar-active"
+                        : "bg-sidebar-hover"
+                    }`}
+                    onClick={handleOpenDataManagement}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <svg
+                        className="h-4 w-4 shrink-0 opacity-80"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M4 5h16" />
+                        <path d="M4 12h16" />
+                        <path d="M4 19h16" />
+                        <path d="M8 3v4" />
+                        <path d="M16 10v4" />
+                        <path d="M12 17v4" />
+                      </svg>
+                      <span className="truncate">数据管理</span>
+                    </span>
+                  </button>
+                </div>
               ) : null}
             </div>
             <div className="mb-2 flex items-center justify-between">
@@ -3282,6 +3317,7 @@ export default function ChatApp(props: Props) {
                                   currentAgent?.slug === "positioning-helper" ||
                                   currentAgent?.slug === "four-things" ||
                                   currentAgent?.slug === "product-one-pager" ||
+                                  currentAgent?.slug === "product-one-pager-series" ||
                                   currentAgent?.slug === "course-outline-single-methodology" ||
                                   currentAgent?.slug === "course-outline" ||
                                   currentAgent?.slug === "course-transcript-single-methodology" ||
@@ -3496,7 +3532,9 @@ export default function ChatApp(props: Props) {
                     <>
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
-                          {PRODUCT_ONE_PAGER_AGENT_NAME}结果内容
+                          {isCourseOutlineSingleMethodologyAgent(currentAgent)
+                            ? `${PRODUCT_ONE_PAGER_SERIES_AGENT_NAME}结果内容`
+                            : `${PRODUCT_ONE_PAGER_AGENT_NAME}结果内容`}
                         </label>
                         <textarea
                           className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -3510,27 +3548,7 @@ export default function ChatApp(props: Props) {
                           }
                         />
                       </div>
-                      {isCourseOutlineSingleMethodologyAgent(currentAgent) ? (
-                        <div>
-                          <label className="mb-1 block text-[11px] text-slate-600">
-                            归心成交
-                          </label>
-                          <textarea
-                            className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            value={referenceForm.guixinTransactionContent ?? ""}
-                            onChange={(event) =>
-                              setReferenceForm((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      guixinTransactionContent: event.target.value
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                        </div>
-                      ) : (
+                      {isCourseOutlineSingleMethodologyAgent(currentAgent) ? null : (
                         <>
                           <div>
                             <label className="mb-1 block text-[11px] text-slate-600">
@@ -3645,7 +3663,9 @@ export default function ChatApp(props: Props) {
                     <>
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-600">
-                          {PRODUCT_ONE_PAGER_AGENT_NAME}结果内容
+                          {isCourseTranscriptSingleMethodologyAgent(currentAgent)
+                            ? `${PRODUCT_ONE_PAGER_SERIES_AGENT_NAME}结果内容`
+                            : `${PRODUCT_ONE_PAGER_AGENT_NAME}结果内容`}
                         </label>
                         <textarea
                           className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -3659,27 +3679,7 @@ export default function ChatApp(props: Props) {
                           }
                         />
                       </div>
-                      {isCourseTranscriptSingleMethodologyAgent(currentAgent) ? (
-                        <div>
-                          <label className="mb-1 block text-[11px] text-slate-600">
-                            归心成交
-                          </label>
-                          <textarea
-                            className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            value={referenceForm.guixinTransactionContent ?? ""}
-                            onChange={(event) =>
-                              setReferenceForm((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      guixinTransactionContent: event.target.value
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                        </div>
-                      ) : (
+                      {isCourseTranscriptSingleMethodologyAgent(currentAgent) ? null : (
                         <>
                           <div>
                             <label className="mb-1 block text-[11px] text-slate-600">
@@ -4001,14 +4001,7 @@ export default function ChatApp(props: Props) {
                                   `产品信息\n${productContent}`
                                 );
                               }
-                              if (isCourseOutlineSingleMethodologyAgent(currentAgent)) {
-                                const guixinTransactionContent = (
-                                  referenceForm.guixinTransactionContent ?? ""
-                                ).trim();
-                                if (guixinTransactionContent) {
-                                  sections.push(`方法论信息\n${guixinTransactionContent}`);
-                                }
-                              } else {
+                              if (!isCourseOutlineSingleMethodologyAgent(currentAgent)) {
                                 const fourThings = (
                                   referenceForm.fourThingsContent ?? ""
                                 ).trim();
@@ -4043,14 +4036,7 @@ export default function ChatApp(props: Props) {
                                     `产品信息\n${productContent}`
                                   );
                                 }
-                                if (isCourseTranscriptSingleMethodologyAgent(currentAgent)) {
-                                  const guixinTransactionContent = (
-                                    referenceForm.guixinTransactionContent ?? ""
-                                  ).trim();
-                                  if (guixinTransactionContent) {
-                                    sections.push(`归心成交\n${guixinTransactionContent}`);
-                                  }
-                                } else {
+                                if (!isCourseTranscriptSingleMethodologyAgent(currentAgent)) {
                                   const fourThings = (
                                     referenceForm.fourThingsContent ?? ""
                                   ).trim();
@@ -4214,6 +4200,9 @@ export default function ChatApp(props: Props) {
                       <option value="">请选择</option>
                       <option value={PRODUCT_ONE_PAGER_AGENT_NAME}>
                         {PRODUCT_ONE_PAGER_AGENT_NAME}
+                      </option>
+                      <option value={PRODUCT_ONE_PAGER_SERIES_AGENT_NAME}>
+                        {PRODUCT_ONE_PAGER_SERIES_AGENT_NAME}
                       </option>
                       <option value="定位">定位</option>
                       <option value="四件事">四件事</option>

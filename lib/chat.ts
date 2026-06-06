@@ -29,16 +29,19 @@ export const SPECIAL_MENU_ITEMS: Array<{
   name: string;
 }> = [{ key: "data-management", name: "数据管理" }];
 
+const HIDDEN_CHAT_MENU_SLUGS = new Set(["guixin-transaction"]);
+
 const DISPLAY_ORDER = [
   "product-one-pager",
   "positioning-helper",
   "four-things",
   "nine-grid",
   "guixin-transaction",
-  "course-outline-single-methodology",
   "course-outline",
-  "course-transcript-single-methodology",
   "course-transcript",
+  "product-one-pager-series",
+  "course-outline-single-methodology",
+  "course-transcript-single-methodology",
   "material-tagging-assistant",
   "deterministic-material-capture-assistant",
   "crisis-material-capture-assistant",
@@ -61,6 +64,10 @@ function sortAgentsByDisplayOrder(agents: Agent[]) {
 
     return 0;
   });
+}
+
+function filterChatMenuAgents(agents: Agent[]) {
+  return agents.filter((agent) => !HIDDEN_CHAT_MENU_SLUGS.has(agent.slug));
 }
 
 export async function listAgents(): Promise<Agent[]> {
@@ -101,11 +108,12 @@ async function getUserAssignedAgentRoleId(userId: number) {
 
 export async function getUserChatAccess(userId: number, userRole: string) {
   const allAgents = await listAgents();
+  const visibleAgents = filterChatMenuAgents(allAgents);
   const allMenuKeys = SPECIAL_MENU_ITEMS.map((item) => item.key);
 
   if (userRole === "super_admin") {
     return {
-      agents: allAgents,
+      agents: visibleAgents,
       allowedAgentIds: allAgents.map((agent) => agent.id),
       menuKeys: allMenuKeys
     };
@@ -114,7 +122,7 @@ export async function getUserChatAccess(userId: number, userRole: string) {
   const assignedRoleId = await getUserAssignedAgentRoleId(userId);
   if (!assignedRoleId) {
     return {
-      agents: allAgents,
+      agents: visibleAgents,
       allowedAgentIds: allAgents.map((agent) => agent.id),
       menuKeys: allMenuKeys
     };
@@ -134,7 +142,7 @@ export async function getUserChatAccess(userId: number, userRole: string) {
   const allowedAgentIds = Array.from(
     new Set(agentMembers.map((row) => row.agent_id))
   );
-  const allowedAgents = allAgents.filter((agent) =>
+  const allowedAgents = visibleAgents.filter((agent) =>
     allowedAgentIds.includes(agent.id)
   );
   const allowedMenuKeySet = new Set(
