@@ -1514,6 +1514,10 @@ function getDefaultPromptTemplate(slug: string) {
     console.log(`[getDefaultPromptTemplate] 返回 experiment-design-assistant 默认模板`);
     return `你是一位资深的实验设计专家，擅长设计科学严谨的实验方案。请根据用户提供的实验目标和条件，设计完整的实验方案，包括：实验假设、自变量和因变量、控制变量、实验组和对照组设计、样本量计算、数据收集方法、统计分析方法等。确保实验设计符合科学原则，能够有效验证假设。`;
   }
+  if (normalized === "ai-outline-refinement") {
+    console.log(`[getDefaultPromptTemplate] 返回 ai-outline-refinement 默认模板`);
+    return "请根据我提供的合订课程手稿内容{{content}}，提炼出一份结构清晰、逻辑完整、适合继续编辑和导出的课程大纲。输出时请优先梳理主题结构、章节层级、每节核心要点与可延展方向，避免照抄原文，尽量保留内容主线并提升可读性。";
+  }
   
   console.log(`[getDefaultPromptTemplate] 没有匹配的slug，返回空字符串`);
   return "";

@@ -22,12 +22,15 @@ export type Message = {
   created_at: string;
 };
 
-export type SpecialMenuKey = "data-management";
+export type SpecialMenuKey = "data-management" | "outline-extraction";
 
 export const SPECIAL_MENU_ITEMS: Array<{
   key: SpecialMenuKey;
   name: string;
-}> = [{ key: "data-management", name: "数据管理" }];
+}> = [
+  { key: "outline-extraction", name: "大纲提取" },
+  { key: "data-management", name: "数据管理" }
+];
 
 const HIDDEN_CHAT_MENU_SLUGS = new Set(["guixin-transaction"]);
 

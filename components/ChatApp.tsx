@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent as ReactDragEvent
+} from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import ReactMarkdown from "react-markdown";
@@ -43,7 +51,7 @@ type CourseRuleRow = {
   rule_content: string;
 };
 
-type ActivePanel = "chat" | "data-management";
+type ActivePanel = "chat" | "outline-extraction" | "data-management";
 
 type ManagedResultRow = {
   id: number;
@@ -55,6 +63,19 @@ type ManagedResultRow = {
   resultContent: string;
   createdAt: string;
   updatedAt: string;
+};
+
+type OutlineExtractionHistoryRow = {
+  id: string;
+  title: string;
+  createdAt: string;
+  chapterCount: number;
+  wordCount: number;
+};
+
+type OutlineExtractionUploadedFile = {
+  id: string;
+  file: File;
 };
 
 type Props = {
@@ -73,6 +94,36 @@ const COURSE_OUTLINE_XINGYUEFENG_AGENT_NAME = "课纲助手「星月蜂」";
 const COURSE_TRANSCRIPT_AGENT_NAME = "课程逐字稿「多方法论」";
 const COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME = "课程逐字稿「产品系列」";
 const COURSE_TRANSCRIPT_XINGYUEFENG_AGENT_NAME = "课程逐字稿「星月蜂」";
+const OUTLINE_EXTRACTION_MERGED_RESULT_AGENT_NAME = "大纲提取「文件合并结果」";
+const OUTLINE_EXTRACTION_AI_RESULT_AGENT_NAME = "大纲提取「AI提炼大纲」";
+const OUTLINE_EXTRACTION_HISTORY_STORAGE_KEY = "outline-extraction-history";
+const OUTLINE_EXTRACTION_MAX_FILES = 60;
+const WORD_FILE_EXTENSIONS = new Set(["doc", "docx"]);
+
+function getFileExtension(fileName: string) {
+  const lastDotIndex = fileName.lastIndexOf(".");
+  if (lastDotIndex < 0) return "";
+  return fileName.slice(lastDotIndex + 1).toLowerCase();
+}
+
+function isWordDocumentFile(file: File) {
+  return WORD_FILE_EXTENSIONS.has(getFileExtension(file.name));
+}
+
+function formatFileSize(size: number) {
+  if (!Number.isFinite(size) || size <= 0) return "0 KB";
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(size / 1024))} KB`;
+}
+
+function normalizeWordTextContent(text: string) {
+  return String(text ?? "")
+    .replace(/\r/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -1028,6 +1079,7 @@ export default function ChatApp(props: Props) {
   const lastAutoScrollConversationIdRef = useRef<number | null>(null);
   const activePollConversationIdRef = useRef<number | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const outlineExtractionFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1106,6 +1158,32 @@ export default function ChatApp(props: Props) {
   const [editingManagedResultContent, setEditingManagedResultContent] =
     useState("");
   const [savingManagedResult, setSavingManagedResult] = useState(false);
+  const [outlineExtractionHistory, setOutlineExtractionHistory] = useState<
+    OutlineExtractionHistoryRow[]
+  >([]);
+  const [outlineExtractionView, setOutlineExtractionView] = useState<
+    "overview" | "wizard"
+  >("overview");
+  const [outlineExtractionStep, setOutlineExtractionStep] = useState<1 | 2 | 3>(
+    1
+  );
+  const [outlineExtractionFiles, setOutlineExtractionFiles] = useState<
+    OutlineExtractionUploadedFile[]
+  >([]);
+  const [outlineExtractionDropActive, setOutlineExtractionDropActive] =
+    useState(false);
+  const [outlineExtractionSeparator, setOutlineExtractionSeparator] =
+    useState("** 第x节 **");
+  const [outlineExtractionMergedDraft, setOutlineExtractionMergedDraft] =
+    useState("");
+  const [outlineExtractionMerging, setOutlineExtractionMerging] =
+    useState(false);
+  const [outlineExtractionAiResult, setOutlineExtractionAiResult] = useState("");
+  const [outlineExtractionRefining, setOutlineExtractionRefining] =
+    useState(false);
+  const [outlineExtractionError, setOutlineExtractionError] = useState<
+    string | null
+  >(null);
   const currentConversationIdRef = useRef<number | null>(null);
 
   const getErrorMessage = useCallback((e: any, fallback: string) => {
@@ -1126,6 +1204,45 @@ export default function ChatApp(props: Props) {
     const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
     textarea.style.height = `${nextHeight}px`;
     textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(
+        OUTLINE_EXTRACTION_HISTORY_STORAGE_KEY
+      );
+      if (!raw) {
+        setOutlineExtractionHistory([]);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setOutlineExtractionHistory([]);
+        return;
+      }
+      const normalized = parsed
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const id = String((item as any).id ?? "").trim();
+          const title = String((item as any).title ?? "").trim();
+          const createdAt = String((item as any).createdAt ?? "").trim();
+          const chapterCount = Number((item as any).chapterCount ?? 0);
+          const wordCount = Number((item as any).wordCount ?? 0);
+          if (!id || !title) return null;
+          return {
+            id,
+            title,
+            createdAt: createdAt || new Date().toISOString(),
+            chapterCount: Number.isFinite(chapterCount) ? chapterCount : 0,
+            wordCount: Number.isFinite(wordCount) ? wordCount : 0
+          };
+        })
+        .filter((item): item is OutlineExtractionHistoryRow => !!item);
+      setOutlineExtractionHistory(normalized);
+    } catch {
+      setOutlineExtractionHistory([]);
+    }
   }, []);
 
   useEffect(() => {
@@ -1150,10 +1267,28 @@ export default function ChatApp(props: Props) {
     () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
     [agents, selectedAgentId]
   );
+  const canAccessOutlineExtraction = allowedMenuKeys.includes(
+    "outline-extraction"
+  );
   const canAccessDataManagement = allowedMenuKeys.includes("data-management");
 
   const isAdminViewer = user.role === "admin" || user.role === "super_admin";
-
+  const outlineExtractionTotalBytes = useMemo(
+    () =>
+      outlineExtractionFiles.reduce(
+        (sum, item) => sum + Math.max(0, item.file.size || 0),
+        0
+      ),
+    [outlineExtractionFiles]
+  );
+  const outlineExtractionEstimatedChars = useMemo(
+    () => Math.max(0, Math.round(outlineExtractionTotalBytes / 2)),
+    [outlineExtractionTotalBytes]
+  );
+  const outlineExtractionEstimatedWanChars = useMemo(
+    () => (outlineExtractionEstimatedChars / 10000).toFixed(2),
+    [outlineExtractionEstimatedChars]
+  );
   const loadManagedResults = useCallback(
     async (filters: {
       productName: string;
@@ -1738,6 +1873,282 @@ export default function ChatApp(props: Props) {
     dataManagementFilters,
     loadManagedResults
   ]);
+
+  const handleOpenOutlineExtraction = useCallback(() => {
+    if (!canAccessOutlineExtraction) return;
+    void cleanupCurrentConversationIfEmpty();
+    setActivePanel("outline-extraction");
+    setMobileSidebarOpen(false);
+  }, [canAccessOutlineExtraction, cleanupCurrentConversationIfEmpty]);
+
+  const applyOutlineExtractionFiles = useCallback((incomingFiles: File[]) => {
+    if (incomingFiles.length === 0) return;
+
+    const invalidFiles = incomingFiles.filter((file) => !isWordDocumentFile(file));
+    if (invalidFiles.length > 0) {
+      setOutlineExtractionError("目前仅支持上传 Word 类型文件（.doc、.docx）");
+      return;
+    }
+
+    setOutlineExtractionFiles((prev) => {
+      const existingKeys = new Set(
+        prev.map(
+          (item) =>
+            `${item.file.name}_${item.file.size}_${item.file.lastModified}`
+        )
+      );
+      const dedupedIncoming = incomingFiles.filter((file) => {
+        const key = `${file.name}_${file.size}_${file.lastModified}`;
+        if (existingKeys.has(key)) return false;
+        existingKeys.add(key);
+        return true;
+      });
+
+      if (prev.length + dedupedIncoming.length > OUTLINE_EXTRACTION_MAX_FILES) {
+        setOutlineExtractionError(
+          `当前最多支持上传 ${OUTLINE_EXTRACTION_MAX_FILES} 个 Word 文件`
+        );
+        return prev;
+      }
+
+      setOutlineExtractionError(null);
+      setOutlineExtractionMergedDraft("");
+      setOutlineExtractionAiResult("");
+      return [
+        ...prev,
+        ...dedupedIncoming.map((file) => ({
+          id: `${file.name}_${file.size}_${file.lastModified}`,
+          file
+        }))
+      ];
+    });
+  }, []);
+
+  const handleStartOutlineExtraction = useCallback(() => {
+    setOutlineExtractionView("wizard");
+    setOutlineExtractionStep(1);
+    setOutlineExtractionFiles([]);
+    setOutlineExtractionDropActive(false);
+    setOutlineExtractionSeparator("** 第x节 **");
+    setOutlineExtractionMergedDraft("");
+    setOutlineExtractionAiResult("");
+    setOutlineExtractionMerging(false);
+    setOutlineExtractionRefining(false);
+    setOutlineExtractionError(null);
+  }, []);
+
+  const handleBackToOutlineExtractionOverview = useCallback(() => {
+    setOutlineExtractionView("overview");
+    setOutlineExtractionStep(1);
+    setOutlineExtractionMergedDraft("");
+    setOutlineExtractionAiResult("");
+    setOutlineExtractionError(null);
+    setOutlineExtractionDropActive(false);
+  }, []);
+
+  const handleOutlineWizardPrevStep = useCallback(() => {
+    setOutlineExtractionStep((prev) => {
+      if (prev === 3) return 2;
+      if (prev === 2) return 1;
+      return prev;
+    });
+    setOutlineExtractionError(null);
+  }, []);
+
+  const handleOutlineWizardNextStep = useCallback(() => {
+    if (outlineExtractionStep === 1) {
+      if (outlineExtractionFiles.length === 0) {
+        setOutlineExtractionError("请先上传至少 1 个 Word 文件后再进入下一步");
+        return;
+      }
+      setOutlineExtractionError(null);
+      setOutlineExtractionStep(2);
+      return;
+    }
+    if (outlineExtractionStep === 2) {
+      setOutlineExtractionError(null);
+      setOutlineExtractionStep(3);
+    }
+  }, [outlineExtractionFiles.length, outlineExtractionStep]);
+
+  const handleGenerateOutlineMergedDraft = useCallback(async () => {
+    if (outlineExtractionFiles.length === 0) {
+      setOutlineExtractionError("当前没有可合并的文稿文件");
+      return;
+    }
+
+    setOutlineExtractionMerging(true);
+    setOutlineExtractionError(null);
+    setOutlineExtractionAiResult("");
+
+    try {
+      const formData = new FormData();
+      formData.set("separator", outlineExtractionSeparator.trim() || "** 第x节 **");
+      outlineExtractionFiles.forEach((item) => {
+        formData.append("files", item.file, item.file.name);
+      });
+
+      const res = await fetch("/api/outline-extraction/merge", {
+        method: "POST",
+        body: formData
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      const data = (await res.json()) as { mergedText?: string };
+      setOutlineExtractionMergedDraft(
+        normalizeWordTextContent(String(data.mergedText ?? ""))
+      );
+    } catch (e: any) {
+      setOutlineExtractionError(
+        getErrorMessage(e, "文件合并失败，请检查 Word 文档是否损坏后重试")
+      );
+    } finally {
+      setOutlineExtractionMerging(false);
+    }
+  }, [
+    getErrorMessage,
+    outlineExtractionFiles,
+    outlineExtractionSeparator
+  ]);
+
+  const handleOutlineAiRefine = useCallback(() => {
+    if (!outlineExtractionMergedDraft.trim()) return;
+    void (async () => {
+      setOutlineExtractionRefining(true);
+      setOutlineExtractionError(null);
+      setOutlineExtractionAiResult("");
+      try {
+        const res = await fetch("/api/outline-extraction/refine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mergedText: outlineExtractionMergedDraft
+          })
+        });
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+        const data = (await res.json()) as { refinedOutline?: string };
+        setOutlineExtractionAiResult(String(data.refinedOutline ?? "").trim());
+      } catch (e: any) {
+        setOutlineExtractionError(
+          getErrorMessage(e, "AI 提炼大纲失败，请稍后重试")
+        );
+      } finally {
+        setOutlineExtractionRefining(false);
+      }
+    })();
+  }, [getErrorMessage, outlineExtractionMergedDraft]);
+
+  const openSaveDialogWithContent = useCallback(
+    async (agentName: string, resultContent: string) => {
+      const normalizedContent = resultContent.trim();
+      if (!normalizedContent) {
+        setError("当前没有可保存的结果内容");
+        return;
+      }
+      const nowIso = new Date().toISOString();
+      setSaveForm({
+        productName: "",
+        agentName,
+        lessonCount: "0",
+        resultContent: normalizedContent,
+        createdAt: nowIso,
+        updatedAt: nowIso
+      });
+      setSaveDialogOpen(true);
+      setSaveDialogOpenedAt(nowIso);
+      try {
+        const res = await fetch("/api/results");
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+        const data: string[] = await res.json();
+        setProductNameOptions(data);
+      } catch (e: any) {
+        setError(getErrorMessage(e, "加载产品名称失败"));
+      }
+    },
+    [getErrorMessage]
+  );
+
+  const handleOpenOutlineMergedResultSave = useCallback(() => {
+    void openSaveDialogWithContent(
+      OUTLINE_EXTRACTION_MERGED_RESULT_AGENT_NAME,
+      outlineExtractionMergedDraft
+    );
+  }, [openSaveDialogWithContent, outlineExtractionMergedDraft]);
+
+  const handleOpenOutlineAiResultSave = useCallback(() => {
+    void openSaveDialogWithContent(
+      OUTLINE_EXTRACTION_AI_RESULT_AGENT_NAME,
+      outlineExtractionAiResult
+    );
+  }, [openSaveDialogWithContent, outlineExtractionAiResult]);
+
+  const handleOpenOutlineFilePicker = useCallback(() => {
+    outlineExtractionFileInputRef.current?.click();
+  }, []);
+
+  const handleOutlineFileInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.target.files ?? []);
+      applyOutlineExtractionFiles(files);
+      event.target.value = "";
+    },
+    [applyOutlineExtractionFiles]
+  );
+
+  const handleOutlineDrop = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setOutlineExtractionDropActive(false);
+      applyOutlineExtractionFiles(Array.from(event.dataTransfer.files ?? []));
+    },
+    [applyOutlineExtractionFiles]
+  );
+
+  const handleOutlineDragOver = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      if (!outlineExtractionDropActive) {
+        setOutlineExtractionDropActive(true);
+      }
+    },
+    [outlineExtractionDropActive]
+  );
+
+  const handleOutlineDragLeave = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const relatedTarget = event.relatedTarget as Node | null;
+      if (event.currentTarget.contains(relatedTarget)) return;
+      setOutlineExtractionDropActive(false);
+    },
+    []
+  );
+
+  const handleRemoveOutlineFile = useCallback((id: string) => {
+    setOutlineExtractionFiles((prev) => prev.filter((item) => item.id !== id));
+    setOutlineExtractionMergedDraft("");
+    setOutlineExtractionAiResult("");
+    setOutlineExtractionError(null);
+  }, []);
+
+  const handleDeleteOutlineHistory = useCallback((id: string) => {
+    setOutlineExtractionHistory((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          OUTLINE_EXTRACTION_HISTORY_STORAGE_KEY,
+          JSON.stringify(next)
+        );
+      }
+      return next;
+    });
+  }, []);
 
   const handleSearchManagedResults = useCallback(() => {
     void loadManagedResults(dataManagementFilters);
@@ -2535,29 +2946,9 @@ export default function ChatApp(props: Props) {
         currentAgent.slug === "product-one-pager-xingyuefeng"
           ? extractProductOnePagerSaveContent(normalizedContent)
           : normalizedContent;
-      const nowIso = new Date().toISOString();
-      setSaveForm({
-        productName: "",
-        agentName: agentDisplayName,
-        lessonCount: "0",
-        resultContent,
-        createdAt: nowIso,
-        updatedAt: nowIso
-      });
-      setSaveDialogOpen(true);
-      setSaveDialogOpenedAt(nowIso);
-      try {
-        const res = await fetch("/api/results");
-        if (!res.ok) {
-          throw new Error(await res.text());
-        }
-        const data: string[] = await res.json();
-        setProductNameOptions(data);
-      } catch (e: any) {
-        setError(getErrorMessage(e, "加载产品名称失败"));
-      }
+      await openSaveDialogWithContent(agentDisplayName, resultContent);
     },
-    [currentAgent, resolveAgentDisplayName]
+    [currentAgent, openSaveDialogWithContent, resolveAgentDisplayName]
   );
 
   const handleOpenReferenceData = useCallback(async () => {
@@ -2707,38 +3098,69 @@ export default function ChatApp(props: Props) {
                     ) : null}
                   </div>
                 ))}
-                {canAccessDataManagement ? (
+                {canAccessOutlineExtraction || canAccessDataManagement ? (
                   <div>
                     <div className="my-2 border-t border-sidebar-active/40" />
-                    <button
-                      type="button"
-                      className={`flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
-                        activePanel === "data-management"
-                          ? "bg-sidebar-active font-medium"
-                          : "hover:bg-sidebar-hover"
-                      }`}
-                      onClick={handleOpenDataManagement}
-                    >
-                      <span className="flex min-w-0 items-center gap-2.5">
-                        <svg
-                          className="h-4 w-4 shrink-0 opacity-80"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M4 5h16" />
-                          <path d="M4 12h16" />
-                          <path d="M4 19h16" />
-                          <path d="M8 3v4" />
-                          <path d="M16 10v4" />
-                          <path d="M12 17v4" />
-                        </svg>
-                        <span className="truncate">数据管理</span>
-                      </span>
-                    </button>
+                    {canAccessOutlineExtraction ? (
+                      <button
+                        type="button"
+                        className={`mb-2 flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
+                          activePanel === "outline-extraction"
+                            ? "bg-sidebar-active font-medium"
+                            : "hover:bg-sidebar-hover"
+                        }`}
+                        onClick={handleOpenOutlineExtraction}
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <svg
+                            className="h-4 w-4 shrink-0 opacity-80"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M7 3h8l5 5v13a1 1 0 0 1-1 1H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z" />
+                            <path d="M15 3v6h6" />
+                            <path d="M8 12h8" />
+                            <path d="M8 16h6" />
+                          </svg>
+                          <span className="truncate">大纲提取</span>
+                        </span>
+                      </button>
+                    ) : null}
+                    {canAccessDataManagement ? (
+                      <button
+                        type="button"
+                        className={`flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
+                          activePanel === "data-management"
+                            ? "bg-sidebar-active font-medium"
+                            : "hover:bg-sidebar-hover"
+                        }`}
+                        onClick={handleOpenDataManagement}
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <svg
+                            className="h-4 w-4 shrink-0 opacity-80"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M4 5h16" />
+                            <path d="M4 12h16" />
+                            <path d="M4 19h16" />
+                            <path d="M8 3v4" />
+                            <path d="M16 10v4" />
+                            <path d="M12 17v4" />
+                          </svg>
+                          <span className="truncate">数据管理</span>
+                        </span>
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -2912,6 +3334,8 @@ export default function ChatApp(props: Props) {
           <div className="text-sm font-semibold">
             {activePanel === "data-management"
               ? "数据管理"
+              : activePanel === "outline-extraction"
+                ? "大纲提取"
               : currentConversation?.title || "AI 对话"}
           </div>
           {(user.role === "admin" || user.role === "super_admin") && (
@@ -2959,38 +3383,69 @@ export default function ChatApp(props: Props) {
                   ) : null}
                 </div>
               ))}
-              {canAccessDataManagement ? (
+              {canAccessOutlineExtraction || canAccessDataManagement ? (
                 <div className="contents">
                   <div className="my-1 h-px w-full basis-full bg-sidebar-active/40" />
-                  <button
-                    type="button"
-                    className={`rounded px-2 py-1 text-xs transition-colors ${
-                      activePanel === "data-management"
-                        ? "bg-sidebar-active"
-                        : "bg-sidebar-hover"
-                    }`}
-                    onClick={handleOpenDataManagement}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <svg
-                        className="h-4 w-4 shrink-0 opacity-80"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M4 5h16" />
-                        <path d="M4 12h16" />
-                        <path d="M4 19h16" />
-                        <path d="M8 3v4" />
-                        <path d="M16 10v4" />
-                        <path d="M12 17v4" />
-                      </svg>
-                      <span className="truncate">数据管理</span>
-                    </span>
-                  </button>
+                  {canAccessOutlineExtraction ? (
+                    <button
+                      type="button"
+                      className={`rounded px-2 py-1 text-xs transition-colors ${
+                        activePanel === "outline-extraction"
+                          ? "bg-sidebar-active"
+                          : "bg-sidebar-hover"
+                      }`}
+                      onClick={handleOpenOutlineExtraction}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <svg
+                          className="h-4 w-4 shrink-0 opacity-80"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M7 3h8l5 5v13a1 1 0 0 1-1 1H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z" />
+                          <path d="M15 3v6h6" />
+                          <path d="M8 12h8" />
+                          <path d="M8 16h6" />
+                        </svg>
+                        <span className="truncate">大纲提取</span>
+                      </span>
+                    </button>
+                  ) : null}
+                  {canAccessDataManagement ? (
+                    <button
+                      type="button"
+                      className={`rounded px-2 py-1 text-xs transition-colors ${
+                        activePanel === "data-management"
+                          ? "bg-sidebar-active"
+                          : "bg-sidebar-hover"
+                      }`}
+                      onClick={handleOpenDataManagement}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <svg
+                          className="h-4 w-4 shrink-0 opacity-80"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 5h16" />
+                          <path d="M4 12h16" />
+                          <path d="M4 19h16" />
+                          <path d="M8 3v4" />
+                          <path d="M16 10v4" />
+                          <path d="M12 17v4" />
+                        </svg>
+                        <span className="truncate">数据管理</span>
+                      </span>
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -3105,6 +3560,8 @@ export default function ChatApp(props: Props) {
               <div className="text-base font-semibold text-sidebar-text">
                 {activePanel === "data-management"
                   ? "数据管理"
+                  : activePanel === "outline-extraction"
+                    ? "大纲提取"
                   : currentConversation?.title || "开始新的对话"}
               </div>
               {activePanel === "data-management" ? (
@@ -3112,6 +3569,10 @@ export default function ChatApp(props: Props) {
                   {isAdminViewer
                     ? "当前为管理员视角，可查看全部已保存结果数据"
                     : "当前仅显示您自己保存的结果数据"}
+                </div>
+              ) : activePanel === "outline-extraction" ? (
+                <div className="mt-0.5 text-xs text-sidebar-text opacity-50">
+                  自动合并章节文稿，并查看历史大纲提炼记录
                 </div>
               ) : currentAgent ? (
                 <div className="mt-0.5 text-xs text-sidebar-text opacity-50">
@@ -3128,6 +3589,18 @@ export default function ChatApp(props: Props) {
                   disabled={loadingManagedResults}
                 >
                   {loadingManagedResults ? "加载中..." : "刷新列表"}
+                </button>
+              ) : activePanel === "outline-extraction" ? (
+                <button
+                  type="button"
+                  className="rounded-lg border border-sidebar-active px-3 py-1.5 text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar-active transition-all"
+                  onClick={
+                    outlineExtractionView === "wizard"
+                      ? handleBackToOutlineExtractionOverview
+                      : handleOpenOutlineExtraction
+                  }
+                >
+                  {outlineExtractionView === "wizard" ? "返回概览" : "刷新列表"}
                 </button>
               ) : (
                 <>
@@ -3163,7 +3636,575 @@ export default function ChatApp(props: Props) {
             </div>
           </div>
 
-          {activePanel === "data-management" ? (
+          {activePanel === "outline-extraction" ? (
+            <div className="min-h-0 flex-1 overflow-y-scroll rounded-tl-[28px] px-6 py-6 custom-scrollbar bg-[#f3efe9]">
+              <div className="mx-auto w-full max-w-6xl space-y-6">
+                {error ? (
+                  <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-600">
+                    {error}
+                  </div>
+                ) : null}
+                {outlineExtractionView === "wizard" ? (
+                  <>
+                    <div className="rounded-[28px] border border-[#24344d] bg-white px-6 py-6 shadow-sm">
+                      <div className="grid gap-3 md:grid-cols-4">
+                        {[
+                          {
+                            index: 1,
+                            title: "载入章节文稿",
+                            description: "批量存入 Word 文档并排列序列"
+                          },
+                          {
+                            index: 2,
+                            title: "合并合成设置",
+                            description: "控制并分析合并分隔符与模板信息"
+                          },
+                          {
+                            index: 3,
+                            title: "提炼并审查",
+                            description: "合订原始手稿并启动 AI 编修大纲"
+                          }
+                        ].map((step) => {
+                          const isActive = step.index === outlineExtractionStep;
+                          const isCompleted = step.index < outlineExtractionStep;
+                          return (
+                            <div
+                              key={step.index}
+                              className={`rounded-2xl px-4 py-3 ${
+                                isActive
+                                  ? "bg-slate-50 ring-1 ring-slate-200"
+                                  : isCompleted
+                                    ? "bg-[#eef4ff]"
+                                    : "bg-transparent"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-semibold ${
+                                    isActive
+                                      ? "border-slate-900 bg-slate-900 text-white"
+                                      : isCompleted
+                                        ? "border-[#2f67ff] bg-[#2f67ff] text-white"
+                                      : "border-slate-200 bg-slate-50 text-slate-400"
+                                  }`}
+                                >
+                                  {isCompleted ? "✓" : step.index}
+                                </div>
+                                <div className="min-w-0">
+                                  <div
+                                    className={`text-sm font-semibold ${
+                                      isActive || isCompleted
+                                        ? "text-slate-900"
+                                        : "text-slate-500"
+                                    }`}
+                                  >
+                                    {step.title}
+                                  </div>
+                                  <div className="mt-1 text-[11px] leading-5 text-slate-400">
+                                    {step.description}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {outlineExtractionStep === 1 ? (
+                      <div className="rounded-[28px] border border-[#24344d] bg-white px-8 py-8 shadow-sm">
+                        <div className="text-[28px] font-semibold tracking-tight text-slate-900">
+                          第 1 步：批量载入章节手稿
+                        </div>
+                        <div className="mt-2 text-sm text-slate-400">
+                          请将包含具体内容的多份 Word 文本拖入。我们将自动分析顺序索引并形成合订集预览。
+                        </div>
+
+                        <div
+                          className={`mt-8 rounded-[24px] border border-dashed px-6 py-14 text-center transition-colors ${
+                            outlineExtractionDropActive
+                              ? "border-[#2f67ff] bg-[#eef4ff]"
+                              : "border-slate-200 bg-slate-50/50"
+                          }`}
+                          onDrop={handleOutlineDrop}
+                          onDragOver={handleOutlineDragOver}
+                          onDragLeave={handleOutlineDragLeave}
+                        >
+                          <input
+                            ref={outlineExtractionFileInputRef}
+                            type="file"
+                            accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            multiple
+                            hidden
+                            onChange={handleOutlineFileInputChange}
+                          />
+                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#2f67ff] shadow-sm">
+                            <svg
+                              className="h-8 w-8"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M12 16V4" />
+                              <path d="M7 9l5-5 5 5" />
+                              <path d="M20 16v4H4v-4" />
+                            </svg>
+                          </div>
+                          <div className="mt-5 text-[18px] font-semibold text-slate-800">
+                            拖拽上传您的 Word 文档（.docx, .doc）
+                          </div>
+                          <div className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-400">
+                            支持批量上传，当前最多可上传 {OUTLINE_EXTRACTION_MAX_FILES} 个文件。
+                            系统会自动分析文件名或章节编号（如：第5节、第12章），并完成智能排序。
+                          </div>
+                          <button
+                            type="button"
+                            className="mt-7 inline-flex items-center rounded-2xl bg-[#2f67ff] px-6 py-3 text-sm font-medium text-white shadow-[0_10px_25px_rgba(47,103,255,0.28)] transition-all hover:translate-y-[-1px] hover:opacity-95"
+                            onClick={handleOpenOutlineFilePicker}
+                          >
+                            选择本地文件
+                          </button>
+                        </div>
+
+                        <div className="mt-5 flex items-center justify-between text-xs text-slate-400">
+                          <span>
+                            已选择 {outlineExtractionFiles.length} / {OUTLINE_EXTRACTION_MAX_FILES} 个文件
+                          </span>
+                          <span>仅支持 Word 类型文件</span>
+                        </div>
+
+                        {outlineExtractionError ? (
+                          <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+                            {outlineExtractionError}
+                          </div>
+                        ) : null}
+
+                        {outlineExtractionFiles.length > 0 ? (
+                          <div className="mt-6 space-y-3">
+                            {outlineExtractionFiles.map((item, index) => (
+                              <div
+                                key={item.id}
+                                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                              >
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-medium text-slate-800">
+                                    {index + 1}. {item.file.name}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-400">
+                                    {formatFileSize(item.file.size)}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="ml-4 shrink-0 text-xs text-slate-400 transition-colors hover:text-slate-700"
+                                  onClick={() => handleRemoveOutlineFile(item.id)}
+                                >
+                                  删除
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : outlineExtractionStep === 2 ? (
+                      <div className="rounded-[28px] border border-[#24344d] bg-white px-8 py-8 shadow-sm">
+                        <div className="text-[28px] font-semibold tracking-tight text-slate-900">
+                          第 2 步：分析并配置合并合订参数
+                        </div>
+                        <div className="mt-2 text-sm text-slate-400">
+                          控制各个章节合成合订本时的连接符号，并预览合并后的统计与 Tokens 看板。
+                        </div>
+
+                        {outlineExtractionError ? (
+                          <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+                            {outlineExtractionError}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-8 grid gap-5 lg:grid-cols-[1fr_1.05fr]">
+                          <div className="rounded-[24px] border border-[#24344d] bg-white px-5 py-5">
+                            <div className="text-sm font-semibold text-slate-800">
+                              计 合并合订分隔符设置（TXT 合成设置）
+                            </div>
+                            <div className="mt-1 text-xs leading-6 text-slate-400">
+                              控制合并这 1 个 Word 内容时，如何在它们之间加入过渡段落标识。
+                            </div>
+
+                            <div className="mt-6 text-sm font-medium text-slate-700">
+                              自定义章节分隔符
+                            </div>
+                            <input
+                              className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-colors focus:border-[#2f67ff] focus:ring-2 focus:ring-[#2f67ff]/15"
+                              value={outlineExtractionSeparator}
+                              onChange={(event) => {
+                                setOutlineExtractionSeparator(event.target.value);
+                                setOutlineExtractionMergedDraft("");
+                                setOutlineExtractionAiResult("");
+                              }}
+                              placeholder="请输入章节分隔符"
+                            />
+                            <div className="mt-3 text-xs leading-6 text-slate-400">
+                              将插入在每个合并文件段落之间作为标识。其中的字段 `x` 会自动替换为对应的章节序号（如 1, 2, 3 等）。
+                            </div>
+                          </div>
+
+                          <div className="rounded-[24px] border border-[#24344d] bg-white px-5 py-5">
+                            <div className="text-sm font-semibold text-slate-800">
+                              铸 合成稿件预合并看板
+                            </div>
+                            <div className="mt-3 border-t border-slate-100" />
+                            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
+                                <div className="text-xs text-slate-400">
+                                  合并文件数
+                                </div>
+                                <div className="mt-3 text-[28px] font-semibold text-slate-800">
+                                  {outlineExtractionFiles.length}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-400">
+                                  个
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
+                                <div className="text-xs text-slate-400">
+                                  总字数统计
+                                </div>
+                                <div className="mt-3 text-[28px] font-semibold text-slate-800">
+                                  {outlineExtractionEstimatedWanChars}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-400">
+                                  万字
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
+                                <div className="text-xs text-slate-400">
+                                  总字符数
+                                </div>
+                                <div className="mt-3 text-[28px] font-semibold text-slate-800">
+                                  {outlineExtractionEstimatedChars.toLocaleString(
+                                    "zh-CN"
+                                  )}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-400">
+                                  字
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-[28px] border border-[#24344d] bg-white px-8 py-8 shadow-sm">
+                        <div className="text-[28px] font-semibold tracking-tight text-slate-900">
+                          第 3 步：合订手稿与 AI 大纲精炼工作区
+                        </div>
+                        <div className="mt-2 text-sm text-slate-400">
+                          查看已按照自定义连接后的最终合订文，并一键呼叫 AI 进行纲要提炼。
+                        </div>
+
+                        {outlineExtractionError ? (
+                          <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+                            {outlineExtractionError}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-8 grid gap-5 xl:grid-cols-[1.2fr_1fr]">
+                          <div className="rounded-[24px] bg-[#081a39] px-6 py-5 text-white shadow-sm">
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <div className="inline-flex items-center rounded-full bg-[#2459ff] px-2 py-1 text-[10px] font-semibold">
+                                  第一阶段
+                                </div>
+                                <div className="mt-3 text-lg font-semibold">
+                                  多章节文稿合并
+                                </div>
+                                <div className="mt-2 text-sm text-white/70">
+                                  将排序好的 {outlineExtractionFiles.length} 个章节，按「{outlineExtractionSeparator}
+                                  」分隔符拼版并生成合订正文。
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                className="shrink-0 rounded-2xl bg-[#2f67ff] px-5 py-2.5 text-sm font-medium text-white shadow-[0_10px_25px_rgba(47,103,255,0.24)] transition-all hover:translate-y-[-1px] hover:opacity-95 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                                onClick={handleGenerateOutlineMergedDraft}
+                                disabled={outlineExtractionMerging}
+                              >
+                                {outlineExtractionMerging ? "合并中..." : "文件合并"}
+                              </button>
+                            </div>
+                            <div className="mt-5 border-t border-white/10 pt-4 text-xs text-white/50">
+                              准备就绪，点击右侧按钮整理章节顺序并生成合订正文。
+                            </div>
+                          </div>
+
+                          <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-6 py-5">
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <div className="text-xs font-semibold text-slate-400">
+                                  第二阶段
+                                </div>
+                                <div className="mt-2 text-lg font-semibold text-slate-500">
+                                  AI 提炼分节大纲
+                                </div>
+                                <div className="mt-2 text-sm text-slate-400">
+                                  {outlineExtractionRefining
+                                    ? "AI 正在根据文件合并结果生成结构化大纲，请稍候。"
+                                    : "合订完成后可继续调用 AI 输出结构化大纲。"}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                className={`shrink-0 rounded-2xl px-5 py-2.5 text-sm font-medium transition-all ${
+                                  outlineExtractionMergedDraft.trim() &&
+                                  !outlineExtractionRefining
+                                    ? "bg-[#2f67ff] text-white shadow-[0_10px_25px_rgba(47,103,255,0.24)] hover:translate-y-[-1px] hover:opacity-95"
+                                    : "bg-slate-200 text-slate-400"
+                                }`}
+                                onClick={handleOutlineAiRefine}
+                                disabled={
+                                  !outlineExtractionMergedDraft.trim() ||
+                                  outlineExtractionRefining
+                                }
+                              >
+                                {outlineExtractionRefining ? "提炼中..." : "AI 提炼大纲"}
+                              </button>
+                            </div>
+                            <div className="mt-5 text-xs text-slate-400">
+                              {outlineExtractionRefining
+                                ? "AI 正在根据文件合并结果生成结构化大纲，请稍候。"
+                                : outlineExtractionMergedDraft
+                                  ? "已生成合订正文，可继续调用 AI 进行大纲提炼。"
+                                  : "请先完成上一步的「文件合并」，再启用 AI 提炼。"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+                          <div className="min-h-[330px] rounded-[24px] border border-slate-200 bg-white">
+                            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 text-sm font-semibold text-slate-700">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[#2f67ff]">✦</span>
+                                <span>文件合并结果</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                                onClick={handleOpenOutlineMergedResultSave}
+                                disabled={!outlineExtractionMergedDraft.trim()}
+                              >
+                                保存
+                              </button>
+                            </div>
+                            <div className="flex min-h-[270px] items-center justify-center px-6 py-6">
+                              {outlineExtractionMergedDraft ? (
+                                <div className="max-h-[270px] w-full overflow-y-auto whitespace-pre-wrap rounded-2xl bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-700">
+                                  {outlineExtractionMergedDraft}
+                                </div>
+                              ) : (
+                                <div className="text-center text-slate-300">
+                                  <div className="text-3xl">✦</div>
+                                  <div className="mt-4 text-sm">
+                                    点击上方的「文件合并」解析 Word 正文并生成合订底稿，可在这里滚动预览完整内容。
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="min-h-[330px] rounded-[24px] border border-slate-200 bg-white">
+                            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 text-sm font-semibold text-slate-700">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[#2f67ff]">▣</span>
+                                <span>AI提炼大纲</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                                onClick={handleOpenOutlineAiResultSave}
+                                disabled={!outlineExtractionAiResult.trim()}
+                              >
+                                保存
+                              </button>
+                            </div>
+                            <div className="flex min-h-[270px] items-center justify-center px-6 py-6">
+                              {outlineExtractionAiResult ? (
+                                <div className="max-h-[270px] w-full overflow-y-auto whitespace-pre-wrap rounded-2xl bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-700">
+                                  {outlineExtractionAiResult}
+                                </div>
+                              ) : (
+                                <div className="w-full rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-center text-sm text-slate-400">
+                                  {outlineExtractionRefining
+                                    ? "AI 正在提炼大纲，请稍候..."
+                                    : "AI 提炼大纲结果将在这里显示，并支持滚动预览。"}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="rounded-[22px] border border-[#24344d] bg-white px-6 py-4 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          className={`rounded-2xl border px-5 py-2.5 text-sm transition-colors ${
+                            outlineExtractionStep === 1
+                              ? "border-slate-200 text-slate-400"
+                              : "border-[#24344d] text-slate-700 hover:bg-slate-50"
+                          }`}
+                          onClick={handleOutlineWizardPrevStep}
+                          disabled={outlineExtractionStep === 1}
+                        >
+                          上一步
+                        </button>
+                        <button
+                          type="button"
+                          className={`rounded-2xl px-5 py-2.5 text-sm font-medium transition-colors ${
+                            outlineExtractionStep === 1
+                              ? outlineExtractionFiles.length > 0
+                                ? "bg-[#0f1e3a] text-white hover:bg-[#13274d]"
+                                : "bg-slate-200 text-slate-500"
+                              : "bg-[#0f1e3a] text-white hover:bg-[#13274d]"
+                          }`}
+                          onClick={
+                            outlineExtractionStep === 3
+                              ? handleStartOutlineExtraction
+                              : handleOutlineWizardNextStep
+                          }
+                          disabled={
+                            outlineExtractionStep === 1 &&
+                            outlineExtractionFiles.length === 0
+                          }
+                        >
+                          {outlineExtractionStep === 3 ? "提炼新文稿" : "下一步"}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative overflow-hidden rounded-[32px] border border-black/5 bg-white px-10 py-12 shadow-sm">
+                      <div className="pointer-events-none absolute right-8 top-4 text-[220px] leading-none text-[#eef1fb]">
+                        ✧
+                      </div>
+                      <div className="relative max-w-3xl">
+                        <div className="text-[18px] font-semibold tracking-tight text-slate-900">
+                          全自动章节合订与
+                        </div>
+                        <div className="mt-1 text-[22px] font-bold text-[#3667ff]">
+                          AI 大纲提取
+                        </div>
+                        <div className="mt-6 max-w-2xl text-sm leading-7 text-slate-500">
+                          将您零散的多章节段落、章节手稿一键进行拼合、标记、测序。通过 AI 自动合订并提炼生成
+                          Docx 特色大纲。
+                        </div>
+                        <button
+                          type="button"
+                          className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-[#2f67ff] px-6 py-3 text-sm font-medium text-white shadow-[0_10px_25px_rgba(47,103,255,0.28)] transition-all hover:translate-y-[-1px] hover:opacity-95"
+                          onClick={handleStartOutlineExtraction}
+                        >
+                          <span className="text-base leading-none">+</span>
+                          <span>提炼新文稿</span>
+                          <span className="text-base leading-none">›</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <svg
+                          className="h-4 w-4 text-slate-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="9" />
+                          <path d="M12 7v5l3 2" />
+                        </svg>
+                        <span>近期的章节合并提炼历史</span>
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        共保存 {outlineExtractionHistory.length} 个历史合订项目
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      {outlineExtractionHistory.length === 0 ? (
+                        <div className="rounded-[28px] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-400 shadow-sm">
+                          暂无历史大纲提炼记录
+                        </div>
+                      ) : (
+                        outlineExtractionHistory.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between rounded-[28px] border border-[#24344d] bg-white px-6 py-5 shadow-sm"
+                          >
+                            <div className="flex min-w-0 items-center gap-4">
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+                                <svg
+                                  className="h-5 w-5"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                  <path d="M14 2v6h6" />
+                                  <path d="M8 13h8" />
+                                  <path d="M8 17h5" />
+                                </svg>
+                              </div>
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-semibold text-slate-800">
+                                  {item.title}
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                                  <span>{formatDateTime(item.createdAt)}</span>
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">
+                                    {item.chapterCount} 章节
+                                  </span>
+                                  <span>{item.wordCount} 字</span>
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="ml-4 shrink-0 text-slate-300 transition-colors hover:text-slate-500"
+                              onClick={() => handleDeleteOutlineHistory(item.id)}
+                              title="删除"
+                            >
+                              <svg
+                                className="h-4 w-4"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M3 6h18" />
+                                <path d="M8 6V4h8v2" />
+                                <path d="M19 6l-1 14H6L5 6" />
+                                <path d="M10 11v6" />
+                                <path d="M14 11v6" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : activePanel === "data-management" ? (
             <div className="min-h-0 flex-1 overflow-y-scroll rounded-tl-[28px] px-6 py-6 custom-scrollbar bg-[#f3efe9]">
               <div className="mx-auto w-full max-w-6xl space-y-4">
                 {error ? (
@@ -4322,6 +5363,12 @@ export default function ChatApp(props: Props) {
                       </option>
                       <option value={COURSE_TRANSCRIPT_AGENT_NAME}>
                         {COURSE_TRANSCRIPT_AGENT_NAME}
+                      </option>
+                      <option value={OUTLINE_EXTRACTION_MERGED_RESULT_AGENT_NAME}>
+                        {OUTLINE_EXTRACTION_MERGED_RESULT_AGENT_NAME}
+                      </option>
+                      <option value={OUTLINE_EXTRACTION_AI_RESULT_AGENT_NAME}>
+                        {OUTLINE_EXTRACTION_AI_RESULT_AGENT_NAME}
                       </option>
                       <option value="课程">课程</option>
                       <option value="素材标记">素材标记</option>

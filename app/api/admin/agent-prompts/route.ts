@@ -18,6 +18,7 @@ const allowedSlugs = [
   "product-one-pager-xingyuefeng",
   "course-outline-xingyuefeng",
   "course-transcript-xingyuefeng",
+  "ai-outline-refinement",
   "positioning-helper",
   "four-things",
   "nine-grid",

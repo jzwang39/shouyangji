@@ -77,6 +77,7 @@ type Props = {
 };
 
 const SPECIAL_MENU_OPTIONS = [
+  { key: "outline-extraction", name: "大纲提取" },
   { key: "data-management", name: "数据管理" }
 ];
 
