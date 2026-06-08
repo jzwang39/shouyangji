@@ -916,6 +916,7 @@ export async function callAiWithPrompt(
   const rawTimeoutMs = process.env.AI_TIMEOUT_MS ?? process.env.AI_REQUEST_TIMEOUT_MS;
   const timeoutMs = rawTimeoutMs ? Number(rawTimeoutMs) : 1200000;
   const effectiveTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 1200000;
+  const normalizedAgentSlug = normalizeAgentSlug(String(options.agentSlug ?? ""));
 
   const baseUrlRaw =
     process.env.AI_BASE_URL ??
@@ -926,8 +927,15 @@ export async function callAiWithPrompt(
   const url = `${baseUrl}/v1/chat/completions`;
   const model = String(setting.model_name ?? "").trim() || "claude-sonnet-4-5-20250929-thinking";
   const rawMaxTokens = process.env.AI_MAX_TOKENS;
-  const maxTokens = rawMaxTokens ? Number(rawMaxTokens) : 16384;
-  const effectiveMaxTokens = Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 200000;
+  const defaultMaxTokens =
+    normalizedAgentSlug === "course-outline" ? 32768 : 16384;
+  const configuredMaxTokens = rawMaxTokens ? Number(rawMaxTokens) : NaN;
+  const effectiveMaxTokens =
+    Number.isFinite(configuredMaxTokens) && configuredMaxTokens > 0
+      ? normalizedAgentSlug === "course-outline"
+        ? Math.max(configuredMaxTokens, defaultMaxTokens)
+        : configuredMaxTokens
+      : defaultMaxTokens;
   const useStream = true;
 
   const isAbortError = (error: unknown) => {
@@ -950,8 +958,6 @@ export async function callAiWithPrompt(
       source.includes("九、")
     );
   };
-
-  const normalizedAgentSlug = normalizeAgentSlug(String(options.agentSlug ?? ""));
 
   const isFourThingsPrompt = (text: string) => {
     const source = String(text ?? "");
@@ -984,8 +990,107 @@ export async function callAiWithPrompt(
     );
   };
 
+  const parseLessonNumberToken = (token: string) => {
+    const normalized = String(token ?? "")
+      .trim()
+      .replace(/两/g, "二")
+      .replace(/〇/g, "零");
+    if (!normalized) return null;
+    if (/^\d+$/.test(normalized)) return Number(normalized);
+
+    const digits: Record<string, number> = {
+      零: 0,
+      一: 1,
+      二: 2,
+      三: 3,
+      四: 4,
+      五: 5,
+      六: 6,
+      七: 7,
+      八: 8,
+      九: 9
+    };
+    let total = 0;
+    let current = 0;
+    for (const char of normalized) {
+      if (char === "十") {
+        total += (current || 1) * 10;
+        current = 0;
+        continue;
+      }
+      if (char === "百") {
+        total += (current || 1) * 100;
+        current = 0;
+        continue;
+      }
+      if (!(char in digits)) return null;
+      current = digits[char];
+    }
+    return total + current;
+  };
+
+  const extractExpectedCourseOutlineLessonCount = (basePrompt: string) => {
+    const source = String(basePrompt ?? "");
+    const targetedPatterns = [
+      /(?:输出|生成|写出|写成|给出|制作|整理|只要|需要|设计)(?:[^0-9一二三四五六七八九十百两〇零]{0,20}?)([0-9一二三四五六七八九十百两〇零]{1,6})\s*(?:节课|节)/g,
+      /设计一门\s*([0-9一二三四五六七八九十百两〇零]{1,6})\s*节课/g,
+      /共\s*([0-9一二三四五六七八九十百两〇零]{1,6})\s*节课/g
+    ];
+    for (const pattern of targetedPatterns) {
+      const matches = [...source.matchAll(pattern)];
+      for (let index = matches.length - 1; index >= 0; index -= 1) {
+        const parsed = parseLessonNumberToken(matches[index]?.[1] ?? "");
+        if (parsed && parsed > 0) return parsed;
+      }
+    }
+    const fallbackMatches = [
+      ...source.matchAll(
+        /([0-9一二三四五六七八九十百两〇零]{1,6})\s*节课/g
+      )
+    ];
+    for (let index = fallbackMatches.length - 1; index >= 0; index -= 1) {
+      const parsed = parseLessonNumberToken(fallbackMatches[index]?.[1] ?? "");
+      if (parsed && parsed > 0) return parsed;
+    }
+    return null;
+  };
+
+  const extractCourseOutlineLessonNumbers = (text: string) => {
+    const matches = [
+      ...String(text ?? "").matchAll(
+        /第\s*([0-9一二三四五六七八九十百两〇零]{1,6})\s*(?:节|课)/g
+      )
+    ];
+    return Array.from(
+      new Set(
+        matches
+          .map((match) => parseLessonNumberToken(match[1] ?? ""))
+          .filter(
+            (value): value is number =>
+              typeof value === "number" && Number.isFinite(value) && value > 0
+          )
+      )
+    ).sort((a, b) => a - b);
+  };
+
+  const isCourseOutlineOutputCompleteEnough = (
+    basePrompt: string,
+    text: string
+  ) => {
+    const lessonNumbers = extractCourseOutlineLessonNumbers(text);
+    if (lessonNumbers.length === 0) return false;
+    const expectedLessonCount = extractExpectedCourseOutlineLessonCount(basePrompt);
+    if (!expectedLessonCount) {
+      return hasStructuredSection(text, `第${lessonNumbers[lessonNumbers.length - 1]}节`);
+    }
+    return lessonNumbers.includes(expectedLessonCount);
+  };
+
   const shouldForceContinue = (basePrompt: string, text: string) => {
     if (!text.trim()) return false;
+    if (normalizedAgentSlug === "course-outline") {
+      return !isCourseOutlineOutputCompleteEnough(basePrompt, text);
+    }
     if (isFourThingsPrompt(basePrompt)) {
       return !isFourThingsOutputCompleteEnough(text);
     }
@@ -1131,6 +1236,26 @@ export async function callAiWithPrompt(
       basePrompt: string,
       previousAssistant: string | null
     ) => {
+      const buildContinuationInstruction = () => {
+        if (normalizedAgentSlug !== "course-outline") {
+          return "继续接着上文输出剩余部分，不要重复，保持原有结构与标题层级，直到完整结束。";
+        }
+        const lessonNumbers = extractCourseOutlineLessonNumbers(
+          previousAssistant ?? ""
+        );
+        const expectedLessonCount =
+          extractExpectedCourseOutlineLessonCount(basePrompt);
+        const nextLessonNumber = lessonNumbers.length
+          ? lessonNumbers[lessonNumbers.length - 1] + 1
+          : null;
+        const startHint = nextLessonNumber
+          ? `请从第${nextLessonNumber}节课继续输出剩余课程大纲，`
+          : "请继续输出剩余课程大纲，";
+        const endHint = expectedLessonCount
+          ? `直到第${expectedLessonCount}节课完整结束。`
+          : "直到完整结束。";
+        return `${startHint}不要重复已经完成的节次，保持原有结构与标题层级，并继续包含“阶段、节次、课程标题、课程目标、核心内容要点”。${endHint}`;
+      };
       if (baseConversationMessages && baseConversationMessages.length > 0) {
         if (previousAssistant && previousAssistant.trim()) {
           return [
@@ -1138,8 +1263,7 @@ export async function callAiWithPrompt(
             { role: "assistant" as const, content: previousAssistant },
             {
               role: "user" as const,
-              content:
-                "继续接着上文输出剩余部分，不要重复，保持原有结构与标题层级，直到完整结束。"
+              content: buildContinuationInstruction()
             }
           ];
         }
@@ -1151,8 +1275,7 @@ export async function callAiWithPrompt(
           { role: "assistant", content: previousAssistant },
           {
             role: "user",
-            content:
-              "继续接着上文输出剩余部分，不要重复，保持原有结构与标题层级，直到完整结束。"
+            content: buildContinuationInstruction()
           }
         ];
       }
