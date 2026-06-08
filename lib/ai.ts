@@ -1407,7 +1407,8 @@ function getDefaultPromptTemplate(slug: string) {
   
   if (
     normalized === "product-one-pager" ||
-    normalized === "product-one-pager-series"
+    normalized === "product-one-pager-series" ||
+    normalized === "product-one-pager-xingyuefeng"
   ) {
     console.log(
       `[getDefaultPromptTemplate] 返回 ${normalized} 默认模板`

@@ -66,10 +66,13 @@ type Props = {
 
 const PRODUCT_ONE_PAGER_AGENT_NAME = "产品一页纸「单一产品」";
 const PRODUCT_ONE_PAGER_SERIES_AGENT_NAME = "产品一页纸「产品系列」";
+const PRODUCT_ONE_PAGER_XINGYUEFENG_AGENT_NAME = "产品一页纸「星月蜂」";
 const COURSE_OUTLINE_AGENT_NAME = "课纲助手「多方法论」";
 const COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME = "课纲助手「产品系列」";
+const COURSE_OUTLINE_XINGYUEFENG_AGENT_NAME = "课纲助手「星月蜂」";
 const COURSE_TRANSCRIPT_AGENT_NAME = "课程逐字稿「多方法论」";
 const COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME = "课程逐字稿「产品系列」";
+const COURSE_TRANSCRIPT_XINGYUEFENG_AGENT_NAME = "课程逐字稿「星月蜂」";
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -630,6 +633,20 @@ function isCourseOutlineSingleMethodologyAgent(
   );
 }
 
+function isCourseOutlineXingyuefengAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "course-outline-xingyuefeng" ||
+    slug === "courseoutlinexingyuefeng" ||
+    slug === "course_outline_xingyuefeng"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name === COURSE_OUTLINE_XINGYUEFENG_AGENT_NAME;
+}
+
 function isCourseTranscriptAgent(agent: Agent | null | undefined) {
   if (!agent) return false;
   const slug = normalizeAgentSlug(agent.slug);
@@ -662,6 +679,20 @@ function isCourseTranscriptSingleMethodologyAgent(
     name.includes("课程逐字稿") &&
     (name.includes("单方法论") || name.includes("产品系列"))
   );
+}
+
+function isCourseTranscriptXingyuefengAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "course-transcript-xingyuefeng" ||
+    slug === "coursetranscriptxingyuefeng" ||
+    slug === "course_transcript_xingyuefeng"
+  ) {
+    return true;
+  }
+  const name = String(agent.name ?? "");
+  return name === COURSE_TRANSCRIPT_XINGYUEFENG_AGENT_NAME;
 }
 
 function isMaterialTaggingAgent(agent: Agent | null | undefined) {
@@ -1456,6 +1487,13 @@ export default function ChatApp(props: Props) {
                     agentName: PRODUCT_ONE_PAGER_SERIES_AGENT_NAME
                   }
                 ]
+              : isCourseOutlineXingyuefengAgent(currentAgent)
+              ? [
+                  {
+                    key: "content",
+                    agentName: PRODUCT_ONE_PAGER_XINGYUEFENG_AGENT_NAME
+                  }
+                ]
               : isCourseOutlineAgent(currentAgent)
               ? [
                   { key: "content", agentName: PRODUCT_ONE_PAGER_AGENT_NAME },
@@ -1466,9 +1504,12 @@ export default function ChatApp(props: Props) {
               ? [
                   {
                     key: "content",
-                    agentName: isCourseTranscriptSingleMethodologyAgent(currentAgent)
+                    agentName:
+                      isCourseTranscriptSingleMethodologyAgent(currentAgent)
                       ? PRODUCT_ONE_PAGER_SERIES_AGENT_NAME
-                      : PRODUCT_ONE_PAGER_AGENT_NAME
+                      : isCourseTranscriptXingyuefengAgent(currentAgent)
+                        ? PRODUCT_ONE_PAGER_XINGYUEFENG_AGENT_NAME
+                        : PRODUCT_ONE_PAGER_AGENT_NAME
                   },
                   ...(isCourseTranscriptSingleMethodologyAgent(currentAgent)
                     ? [
@@ -1477,6 +1518,13 @@ export default function ChatApp(props: Props) {
                           agentName: COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME
                         }
                       ]
+                    : isCourseTranscriptXingyuefengAgent(currentAgent)
+                      ? [
+                          {
+                            key: "courseOutlineContent" as const,
+                            agentName: COURSE_OUTLINE_XINGYUEFENG_AGENT_NAME
+                          }
+                        ]
                     : [
                         { key: "fourThingsContent" as const, agentName: "四件事" },
                         { key: "nineGridContent" as const, agentName: "九宫格" },
@@ -2407,7 +2455,12 @@ export default function ChatApp(props: Props) {
   useEffect(() => {
     if (!currentConversationId) return;
     if (loadingMessages) return;
-    if (currentAgent?.slug !== "product-one-pager") return;
+    if (
+      currentAgent?.slug !== "product-one-pager" &&
+      currentAgent?.slug !== "product-one-pager-xingyuefeng"
+    ) {
+      return;
+    }
     if (generatingConversationId !== currentConversationId) return;
 
     requestAnimationFrame(() => {
@@ -2437,6 +2490,9 @@ export default function ChatApp(props: Props) {
       if (slug === "product-one-pager-series") {
         return PRODUCT_ONE_PAGER_SERIES_AGENT_NAME;
       }
+      if (slug === "product-one-pager-xingyuefeng") {
+        return PRODUCT_ONE_PAGER_XINGYUEFENG_AGENT_NAME;
+      }
       if (slug === "positioning-helper") return "定位助手「单一产品」";
       if (slug === "four-things") return "四件事";
       if (slug === "nine-grid") return "九宫格";
@@ -2444,9 +2500,15 @@ export default function ChatApp(props: Props) {
       if (slug === "course-outline-single-methodology") {
         return COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME;
       }
+      if (slug === "course-outline-xingyuefeng") {
+        return COURSE_OUTLINE_XINGYUEFENG_AGENT_NAME;
+      }
       if (slug === "course-outline") return COURSE_OUTLINE_AGENT_NAME;
       if (slug === "course-transcript-single-methodology") {
         return COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME;
+      }
+      if (slug === "course-transcript-xingyuefeng") {
+        return COURSE_TRANSCRIPT_XINGYUEFENG_AGENT_NAME;
       }
       if (slug === "course-transcript") return COURSE_TRANSCRIPT_AGENT_NAME;
       if (slug === "material-tagging-assistant") return "素材标记";
@@ -2469,7 +2531,8 @@ export default function ChatApp(props: Props) {
       const normalizedContent = stripPendingPrefix(message.content);
       const resultContent =
         currentAgent.slug === "product-one-pager" ||
-        currentAgent.slug === "product-one-pager-series"
+        currentAgent.slug === "product-one-pager-series" ||
+        currentAgent.slug === "product-one-pager-xingyuefeng"
           ? extractProductOnePagerSaveContent(normalizedContent)
           : normalizedContent;
       const nowIso = new Date().toISOString();
@@ -2639,6 +2702,9 @@ export default function ChatApp(props: Props) {
                         <span className="truncate">{agent.name}</span>
                       </span>
                     </button>
+                    {agent.slug === "course-transcript-single-methodology" ? (
+                      <div className="my-2 border-t border-sidebar-active/40" />
+                    ) : null}
                   </div>
                 ))}
                 {canAccessDataManagement ? (
@@ -2888,6 +2954,9 @@ export default function ChatApp(props: Props) {
                       <span className="truncate">{agent.name}</span>
                     </span>
                   </button>
+                  {agent.slug === "course-transcript-single-methodology" ? (
+                    <div className="my-1 h-px w-full basis-full bg-sidebar-active/40" />
+                  ) : null}
                 </div>
               ))}
               {canAccessDataManagement ? (
@@ -3318,9 +3387,12 @@ export default function ChatApp(props: Props) {
                                   currentAgent?.slug === "four-things" ||
                                   currentAgent?.slug === "product-one-pager" ||
                                   currentAgent?.slug === "product-one-pager-series" ||
+                                  currentAgent?.slug === "product-one-pager-xingyuefeng" ||
                                   currentAgent?.slug === "course-outline-single-methodology" ||
+                                  currentAgent?.slug === "course-outline-xingyuefeng" ||
                                   currentAgent?.slug === "course-outline" ||
                                   currentAgent?.slug === "course-transcript-single-methodology" ||
+                                  currentAgent?.slug === "course-transcript-xingyuefeng" ||
                                   currentAgent?.slug === "course-transcript" ||
                                   currentAgent?.slug === "material-tagging-assistant" ||
                                   isGuixinTransactionAgent(currentAgent)) ? (
@@ -3482,7 +3554,13 @@ export default function ChatApp(props: Props) {
                   <div className="text-sm font-semibold">
                     {currentAgent && isAnyMaterialCaptureAgent(currentAgent)
                       ? "引用素材标记结果"
-                      : `引用${PRODUCT_ONE_PAGER_AGENT_NAME}结果`}
+                      : `引用${
+                          currentAgent &&
+                          (isCourseOutlineXingyuefengAgent(currentAgent) ||
+                            isCourseTranscriptXingyuefengAgent(currentAgent))
+                            ? PRODUCT_ONE_PAGER_XINGYUEFENG_AGENT_NAME
+                            : PRODUCT_ONE_PAGER_AGENT_NAME
+                        }结果`}
                   </div>
                   <button
                     type="button"
@@ -3534,7 +3612,9 @@ export default function ChatApp(props: Props) {
                         <label className="mb-1 block text-[11px] text-slate-600">
                           {isCourseOutlineSingleMethodologyAgent(currentAgent)
                             ? `${PRODUCT_ONE_PAGER_SERIES_AGENT_NAME}结果内容`
-                            : `${PRODUCT_ONE_PAGER_AGENT_NAME}结果内容`}
+                            : isCourseOutlineXingyuefengAgent(currentAgent)
+                              ? `${PRODUCT_ONE_PAGER_XINGYUEFENG_AGENT_NAME}结果内容`
+                              : `${PRODUCT_ONE_PAGER_AGENT_NAME}结果内容`}
                         </label>
                         <textarea
                           className="h-32 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -3548,7 +3628,8 @@ export default function ChatApp(props: Props) {
                           }
                         />
                       </div>
-                      {isCourseOutlineSingleMethodologyAgent(currentAgent) ? null : (
+                      {isCourseOutlineSingleMethodologyAgent(currentAgent) ||
+                      isCourseOutlineXingyuefengAgent(currentAgent) ? null : (
                         <>
                           <div>
                             <label className="mb-1 block text-[11px] text-slate-600">
@@ -3665,6 +3746,8 @@ export default function ChatApp(props: Props) {
                         <label className="mb-1 block text-[11px] text-slate-600">
                           {isCourseTranscriptSingleMethodologyAgent(currentAgent)
                             ? `${PRODUCT_ONE_PAGER_SERIES_AGENT_NAME}结果内容`
+                            : isCourseTranscriptXingyuefengAgent(currentAgent)
+                              ? `${PRODUCT_ONE_PAGER_XINGYUEFENG_AGENT_NAME}结果内容`
                             : `${PRODUCT_ONE_PAGER_AGENT_NAME}结果内容`}
                         </label>
                         <textarea
@@ -3679,7 +3762,8 @@ export default function ChatApp(props: Props) {
                           }
                         />
                       </div>
-                      {isCourseTranscriptSingleMethodologyAgent(currentAgent) ? null : (
+                      {isCourseTranscriptSingleMethodologyAgent(currentAgent) ||
+                      isCourseTranscriptXingyuefengAgent(currentAgent) ? null : (
                         <>
                           <div>
                             <label className="mb-1 block text-[11px] text-slate-600">
@@ -3725,6 +3809,8 @@ export default function ChatApp(props: Props) {
                         <label className="mb-1 block text-[11px] text-slate-600">
                           {isCourseTranscriptSingleMethodologyAgent(currentAgent)
                             ? `${COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME}结果内容`
+                            : isCourseTranscriptXingyuefengAgent(currentAgent)
+                              ? `${COURSE_OUTLINE_XINGYUEFENG_AGENT_NAME}结果内容`
                             : `${COURSE_OUTLINE_AGENT_NAME}结果内容`}
                         </label>
                         <textarea
@@ -3765,7 +3851,8 @@ export default function ChatApp(props: Props) {
                           ))}
                         </select>
                       </div>
-                      {isCourseTranscriptSingleMethodologyAgent(currentAgent) ? null : (
+                      {isCourseTranscriptSingleMethodologyAgent(currentAgent) ||
+                      isCourseTranscriptXingyuefengAgent(currentAgent) ? null : (
                         <div>
                           <label className="mb-1 block text-[11px] text-slate-600">
                             四件事和九宫格对应关系
@@ -4001,7 +4088,10 @@ export default function ChatApp(props: Props) {
                                   `产品信息\n${productContent}`
                                 );
                               }
-                              if (!isCourseOutlineSingleMethodologyAgent(currentAgent)) {
+                              if (
+                                !isCourseOutlineSingleMethodologyAgent(currentAgent) &&
+                                !isCourseOutlineXingyuefengAgent(currentAgent)
+                              ) {
                                 const fourThings = (
                                   referenceForm.fourThingsContent ?? ""
                                 ).trim();
@@ -4036,7 +4126,10 @@ export default function ChatApp(props: Props) {
                                     `产品信息\n${productContent}`
                                   );
                                 }
-                                if (!isCourseTranscriptSingleMethodologyAgent(currentAgent)) {
+                                if (
+                                  !isCourseTranscriptSingleMethodologyAgent(currentAgent) &&
+                                  !isCourseTranscriptXingyuefengAgent(currentAgent)
+                                ) {
                                   const fourThings = (
                                     referenceForm.fourThingsContent ?? ""
                                   ).trim();
@@ -4060,6 +4153,7 @@ export default function ChatApp(props: Props) {
                             const previousOutline = courseTranscriptPreviousLessonOutline.trim();
                             if (
                               !isCourseTranscriptSingleMethodologyAgent(currentAgent) &&
+                              !isCourseTranscriptXingyuefengAgent(currentAgent) &&
                               mapping
                             ) {
                               extraSections.push(
@@ -4204,6 +4298,9 @@ export default function ChatApp(props: Props) {
                       <option value={PRODUCT_ONE_PAGER_SERIES_AGENT_NAME}>
                         {PRODUCT_ONE_PAGER_SERIES_AGENT_NAME}
                       </option>
+                      <option value={PRODUCT_ONE_PAGER_XINGYUEFENG_AGENT_NAME}>
+                        {PRODUCT_ONE_PAGER_XINGYUEFENG_AGENT_NAME}
+                      </option>
                       <option value="定位">定位</option>
                       <option value="四件事">四件事</option>
                       <option value="九宫格">九宫格</option>
@@ -4211,11 +4308,17 @@ export default function ChatApp(props: Props) {
                       <option value={COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME}>
                         {COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME}
                       </option>
+                      <option value={COURSE_OUTLINE_XINGYUEFENG_AGENT_NAME}>
+                        {COURSE_OUTLINE_XINGYUEFENG_AGENT_NAME}
+                      </option>
                       <option value={COURSE_OUTLINE_AGENT_NAME}>
                         {COURSE_OUTLINE_AGENT_NAME}
                       </option>
                       <option value={COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME}>
                         {COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME}
+                      </option>
+                      <option value={COURSE_TRANSCRIPT_XINGYUEFENG_AGENT_NAME}>
+                        {COURSE_TRANSCRIPT_XINGYUEFENG_AGENT_NAME}
                       </option>
                       <option value={COURSE_TRANSCRIPT_AGENT_NAME}>
                         {COURSE_TRANSCRIPT_AGENT_NAME}

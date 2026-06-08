@@ -21,6 +21,7 @@ const AI_AGENT_SLUGS = new Set([
   "position-helper",
   "product-one-pager",
   "product-one-pager-series",
+  "product-one-pager-xingyuefeng",
   "four-things",
   "nine-grid",
   "guixin-transaction",
@@ -347,6 +348,7 @@ ${content}`
       if (
         normalizedConversationSlug === "product-one-pager" ||
         normalizedConversationSlug === "product-one-pager-series" ||
+        normalizedConversationSlug === "product-one-pager-xingyuefeng" ||
         isExperimentDesignConversation
       ) {
         const historyRows = await query<{
