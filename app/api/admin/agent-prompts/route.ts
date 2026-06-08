@@ -15,6 +15,9 @@ function assertSuperAdmin(session: any) {
 
 const allowedSlugs = [
   "product-one-pager",
+  "product-one-pager-xingyuefeng",
+  "course-outline-xingyuefeng",
+  "course-transcript-xingyuefeng",
   "positioning-helper",
   "four-things",
   "nine-grid",
