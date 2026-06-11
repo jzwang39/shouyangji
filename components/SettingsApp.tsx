@@ -38,6 +38,14 @@ type LogRow = {
   created_at: string;
 };
 
+type LogListResponse = {
+  items: LogRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
 type AgentRow = {
   id: number;
   name: string;
@@ -72,7 +80,7 @@ type Props = {
   currentUser: UserInfo;
   initialAiSetting: AiSetting;
   initialUsers: UserRow[];
-  initialLogs: LogRow[];
+  initialLogs: LogListResponse;
   initialAgents: AgentRow[];
 };
 
@@ -80,6 +88,22 @@ const SPECIAL_MENU_OPTIONS = [
   { key: "outline-extraction", name: "大纲提取" },
   { key: "data-management", name: "数据管理" }
 ];
+
+function stringifyLogMetadata(metadata: unknown) {
+  if (metadata == null) return "";
+  if (typeof metadata === "string") return metadata;
+  try {
+    return JSON.stringify(metadata, null, 2);
+  } catch {
+    return String(metadata);
+  }
+}
+
+function getLogMetadataPreview(metadata: unknown) {
+  const content = stringifyLogMetadata(metadata).replace(/\s+/g, " ").trim();
+  if (!content) return "-";
+  return content.length > 80 ? `${content.slice(0, 80)}...` : content;
+}
 
 export default function SettingsApp(props: Props) {
   const { currentUser, initialAiSetting, initialUsers, initialLogs, initialAgents } =
@@ -94,7 +118,7 @@ export default function SettingsApp(props: Props) {
   const [apiKey, setApiKey] = useState(initialAiSetting?.apiKey ?? "");
   const [theme, setTheme] = useState(initialAiSetting?.theme ?? "blue");
   const [users, setUsers] = useState<UserRow[]>(initialUsers);
-  const [logs, setLogs] = useState<LogRow[]>(initialLogs);
+  const [logsData, setLogsData] = useState<LogListResponse>(initialLogs);
   const [agents] = useState<AgentRow[]>(initialAgents);
   const [agentRoles, setAgentRoles] = useState<AgentRole[]>([]);
   const [userRoleMap, setUserRoleMap] = useState<Record<number, number | null>>(
@@ -127,6 +151,9 @@ export default function SettingsApp(props: Props) {
   const [savingAi, setSavingAi] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logUserKeywordDraft, setLogUserKeywordDraft] = useState("");
+  const [logUserKeyword, setLogUserKeyword] = useState("");
+  const [selectedLog, setSelectedLog] = useState<LogRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [agentPrompts, setAgentPrompts] = useState<AgentPromptRow[] | null>(
     null
@@ -613,21 +640,44 @@ export default function SettingsApp(props: Props) {
     }
   };
 
-  const handleReloadLogs = async () => {
+  const handleReloadLogs = async (
+    page = logsData.page,
+    pageSize = logsData.pageSize,
+    userKeyword = logUserKeyword
+  ) => {
     setLoadingLogs(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/operation-logs");
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize)
+      });
+      if (userKeyword.trim()) {
+        params.set("user", userKeyword.trim());
+      }
+      const res = await fetch(`/api/admin/operation-logs?${params.toString()}`);
       if (!res.ok) {
         throw new Error(await res.text());
       }
-      const list: LogRow[] = await res.json();
-      setLogs(list);
+      const list: LogListResponse = await res.json();
+      setLogsData(list);
     } catch (e: any) {
       setError(e.message ?? "加载操作记录失败");
     } finally {
       setLoadingLogs(false);
     }
+  };
+
+  const handleSearchLogsByUser = async () => {
+    const keyword = logUserKeywordDraft.trim();
+    setLogUserKeyword(keyword);
+    await handleReloadLogs(1, logsData.pageSize, keyword);
+  };
+
+  const handleResetLogSearch = async () => {
+    setLogUserKeywordDraft("");
+    setLogUserKeyword("");
+    await handleReloadLogs(1, logsData.pageSize, "");
   };
 
   return (
@@ -1335,33 +1385,110 @@ export default function SettingsApp(props: Props) {
 
         {tab === "logs" ? (
           <div className="space-y-4 text-[11px]">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-sidebar-text">操作记录（最近 100 条）</div>
-              <button
-                type="button"
-                className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar transition-all"
-                onClick={handleReloadLogs}
-                disabled={loadingLogs}
-              >
-                {loadingLogs ? "刷新中..." : "刷新"}
-              </button>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-sidebar-text">操作记录</div>
+                <div className="mt-1 text-[11px] text-sidebar-text opacity-60">
+                  共 {logsData.total} 条，当前第 {logsData.page} / {logsData.totalPages} 页，每页 {logsData.pageSize} 条
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  className="w-48 rounded-lg border border-sidebar-active/60 bg-white px-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-active focus:ring-1 focus:ring-sidebar-active/30"
+                  placeholder="按用户搜索"
+                  value={logUserKeywordDraft}
+                  onChange={(event) => setLogUserKeywordDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      void handleSearchLogsByUser();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 transition-all hover:bg-sidebar hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => void handleSearchLogsByUser()}
+                  disabled={loadingLogs}
+                >
+                  搜索
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 transition-all hover:bg-sidebar hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => void handleResetLogSearch()}
+                  disabled={loadingLogs && !logUserKeyword && !logUserKeywordDraft}
+                >
+                  重置
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 transition-all hover:bg-sidebar hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => void handleReloadLogs(1)}
+                  disabled={loadingLogs || logsData.page <= 1}
+                >
+                  首页
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 transition-all hover:bg-sidebar hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => void handleReloadLogs(logsData.page - 1)}
+                  disabled={loadingLogs || logsData.page <= 1}
+                >
+                  上一页
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 transition-all hover:bg-sidebar hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => void handleReloadLogs(logsData.page + 1)}
+                  disabled={loadingLogs || logsData.page >= logsData.totalPages}
+                >
+                  下一页
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 transition-all hover:bg-sidebar hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => void handleReloadLogs(logsData.totalPages)}
+                  disabled={loadingLogs || logsData.page >= logsData.totalPages}
+                >
+                  末页
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-sidebar-active/60 px-3 py-1.5 text-xs text-sidebar-text opacity-70 hover:opacity-100 hover:bg-sidebar transition-all"
+                  onClick={() => void handleReloadLogs()}
+                  disabled={loadingLogs}
+                >
+                  {loadingLogs ? "刷新中..." : "刷新"}
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-sidebar-active/40">
-              <table className="min-w-full border-collapse">
+            {logUserKeyword ? (
+              <div className="text-[11px] text-sidebar-text opacity-60">
+                当前搜索用户：{logUserKeyword}
+              </div>
+            ) : null}
+            <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-sidebar-active/40 custom-scrollbar">
+              <table className="min-w-[1100px] w-full border-collapse">
                 <thead>
                   <tr className="bg-sidebar">
                     <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">时间</th>
+                    <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">ID</th>
                     <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">用户</th>
                     <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">动作</th>
                     <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">对象</th>
-                    <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">详情</th>
+                    <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">详情预览</th>
+                    <th className="border-b border-sidebar-active/30 px-3 py-2 text-left text-[10px] uppercase tracking-wider text-sidebar-text opacity-50 font-medium">操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.map((log) => (
+                  {logsData.items.map((log) => (
                     <tr key={log.id} className="border-b border-sidebar-active/20 hover:bg-sidebar/40 transition-colors">
                       <td className="px-3 py-2 text-sidebar-text opacity-60">
                         {new Date(log.created_at).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2 text-sidebar-text opacity-60">
+                        {log.id}
                       </td>
                       <td className="px-3 py-2 font-medium text-sidebar-text">
                         {log.username ?? "-"}
@@ -1372,13 +1499,27 @@ export default function SettingsApp(props: Props) {
                         {log.target_id ? `#${log.target_id}` : ""}
                       </td>
                       <td className="px-3 py-2 text-sidebar-text opacity-60 max-w-xs truncate">
-                        {log.metadata ? JSON.stringify(log.metadata) : "-"}
+                        {getLogMetadataPreview(log.metadata)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          className="rounded-lg border border-sidebar-active/60 px-3 py-1 text-xs text-sidebar-text transition-colors hover:bg-sidebar"
+                          onClick={() => setSelectedLog(log)}
+                        >
+                          查看详情
+                        </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {logsData.items.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-sidebar-active/40 px-4 py-6 text-center text-xs text-sidebar-text opacity-60">
+                暂无审计日志
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -1511,6 +1652,78 @@ export default function SettingsApp(props: Props) {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {selectedLog ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-sidebar-active/40 bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-sidebar-active/20 px-6 py-4">
+                <div>
+                  <div className="text-sm font-semibold text-sidebar-text">
+                    审计日志详情
+                  </div>
+                  <div className="mt-1 text-[11px] text-sidebar-text opacity-60">
+                    日志 ID：{selectedLog.id}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-lg border border-sidebar-active/60 px-3 py-1 text-xs text-sidebar-text opacity-70 transition-opacity hover:opacity-100"
+                  onClick={() => setSelectedLog(null)}
+                >
+                  关闭
+                </button>
+              </div>
+              <div className="space-y-4 overflow-y-auto p-6 text-xs custom-scrollbar">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl bg-sidebar p-4">
+                    <div className="mb-1 text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
+                      时间
+                    </div>
+                    <div className="break-all text-sidebar-text">
+                      {new Date(selectedLog.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-sidebar p-4">
+                    <div className="mb-1 text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
+                      用户
+                    </div>
+                    <div className="break-all text-sidebar-text">
+                      {selectedLog.username ?? "-"}
+                      {selectedLog.user_id ? `（ID: ${selectedLog.user_id}）` : ""}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-sidebar p-4">
+                    <div className="mb-1 text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
+                      动作
+                    </div>
+                    <div className="break-all text-sidebar-text">
+                      {selectedLog.action}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-sidebar p-4">
+                    <div className="mb-1 text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
+                      对象
+                    </div>
+                    <div className="break-all text-sidebar-text">
+                      {selectedLog.target_type ?? "-"}
+                      {selectedLog.target_id ? ` #${selectedLog.target_id}` : ""}
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-xl bg-sidebar p-4">
+                  <div className="mb-2 text-[11px] uppercase tracking-wider text-sidebar-text opacity-50">
+                    详情数据
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-sidebar-active/20 bg-white custom-scrollbar">
+                    <pre className="min-w-full whitespace-pre-wrap break-words px-4 py-3 text-[11px] leading-6 text-sidebar-text">
+                      {stringifyLogMetadata(selectedLog.metadata) || "-"}
+                    </pre>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

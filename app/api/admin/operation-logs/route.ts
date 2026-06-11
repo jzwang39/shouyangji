@@ -21,12 +21,45 @@ export async function GET(request: Request) {
     return new NextResponse("Forbidden", { status: 403 });
   }
   const { searchParams } = new URL(request.url);
-  const limitParam = searchParams.get("limit");
-  const limit = limitParam ? Math.min(Number(limitParam), 200) : 100;
-  const rows = await query(
-    "SELECT l.id, l.user_id, u.username, l.action, l.target_type, l.target_id, l.metadata, l.created_at FROM operation_logs l LEFT JOIN users u ON l.user_id = u.id ORDER BY l.id DESC LIMIT ?",
-    [limit]
-  );
-  return NextResponse.json(rows);
-}
+  const pageParam = Number(searchParams.get("page") ?? "1");
+  const pageSizeParam = Number(searchParams.get("pageSize") ?? "100");
+  const userKeyword = String(searchParams.get("user") ?? "").trim();
+  const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
+  const pageSize =
+    Number.isFinite(pageSizeParam) && pageSizeParam > 0
+      ? Math.min(Math.floor(pageSizeParam), 200)
+      : 100;
+  const offset = (page - 1) * pageSize;
+  const whereClause = userKeyword ? "WHERE u.username LIKE ?" : "";
+  const queryParams = userKeyword ? [`%${userKeyword}%`] : [];
 
+  const [rows, totalRows] = await Promise.all([
+    query(
+      `SELECT l.id, l.user_id, u.username, l.action, l.target_type, l.target_id, l.metadata, l.created_at
+       FROM operation_logs l
+       LEFT JOIN users u ON l.user_id = u.id
+       ${whereClause}
+       ORDER BY l.id DESC
+       LIMIT ? OFFSET ?`,
+      [...queryParams, pageSize, offset]
+    ),
+    query<{ total: number }>(
+      `SELECT COUNT(*) AS total
+       FROM operation_logs l
+       LEFT JOIN users u ON l.user_id = u.id
+       ${whereClause}`,
+      queryParams
+    )
+  ]);
+
+  const total = Number((totalRows[0] as any)?.total ?? 0);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return NextResponse.json({
+    items: rows,
+    total,
+    page,
+    pageSize,
+    totalPages
+  });
+}

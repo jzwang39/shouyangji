@@ -5,6 +5,8 @@ import SettingsApp from "@/components/SettingsApp";
 import { query } from "@/lib/db";
 import { listAgents } from "@/lib/chat";
 
+const INITIAL_LOGS_PAGE_SIZE = 100;
+
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
   if (!session || !session.user) {
@@ -16,7 +18,7 @@ export default async function SettingsPage() {
   }
   const userId = Number((session.user as any).id);
 
-  const [aiSettingsRows, userRows, logRows, agents] = await Promise.all([
+  const [aiSettingsRows, userRows, logRows, logCountRows, agents] = await Promise.all([
     query(
       "SELECT id, model_name, api_key, theme, updated_at FROM ai_settings ORDER BY id DESC LIMIT 1"
     ),
@@ -24,8 +26,10 @@ export default async function SettingsPage() {
       "SELECT id, username, role, is_active, is_deleted, created_at FROM users ORDER BY id ASC"
     ),
     query(
-      "SELECT l.id, l.user_id, u.username, l.action, l.target_type, l.target_id, l.metadata, l.created_at FROM operation_logs l LEFT JOIN users u ON l.user_id = u.id ORDER BY l.id DESC LIMIT 100"
+      "SELECT l.id, l.user_id, u.username, l.action, l.target_type, l.target_id, l.metadata, l.created_at FROM operation_logs l LEFT JOIN users u ON l.user_id = u.id ORDER BY l.id DESC LIMIT ?",
+      [INITIAL_LOGS_PAGE_SIZE]
     ),
+    query<{ total: number }>("SELECT COUNT(*) AS total FROM operation_logs"),
     listAgents()
   ]);
 
@@ -48,7 +52,16 @@ export default async function SettingsPage() {
       }}
       initialAiSetting={aiSetting}
       initialUsers={userRows as any}
-      initialLogs={logRows as any}
+      initialLogs={{
+        items: logRows as any,
+        total: Number((logCountRows[0] as any)?.total ?? 0),
+        page: 1,
+        pageSize: INITIAL_LOGS_PAGE_SIZE,
+        totalPages: Math.max(
+          1,
+          Math.ceil(Number((logCountRows[0] as any)?.total ?? 0) / INITIAL_LOGS_PAGE_SIZE)
+        )
+      }}
       initialAgents={agents as any}
     />
   );
