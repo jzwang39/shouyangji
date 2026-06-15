@@ -349,6 +349,7 @@ ${content}`
         normalizedConversationSlug === "product-one-pager" ||
         normalizedConversationSlug === "product-one-pager-series" ||
         normalizedConversationSlug === "product-one-pager-xingyuefeng" ||
+        isMaterialTaggingConversation ||
         isExperimentDesignConversation
       ) {
         const historyRows = await query<{
