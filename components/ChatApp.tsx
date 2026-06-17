@@ -665,6 +665,15 @@ function isCourseOutlineAgent(agent: Agent | null | undefined) {
   return name.includes("课纲助手") || name === "课纲";
 }
 
+function isCourseOutlineMultiMethodologyAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (slug === "course-outline" || slug === "courseoutline" || slug === "course_outline") {
+    return true;
+  }
+  return String(agent.name ?? "").trim() === COURSE_OUTLINE_AGENT_NAME;
+}
+
 function isCourseOutlineSingleMethodologyAgent(
   agent: Agent | null | undefined
 ) {
@@ -882,6 +891,74 @@ function mergeAssistantContent(previous: string, current: string) {
   }
 
   return `${previousText.replace(/\s+$/, "")}\n\n${currentText.replace(/^\s+/, "")}`;
+}
+
+function findSuffixPrefixOverlap(previous: string, current: string) {
+  const left = previous.replace(/\s+$/, "");
+  const right = current.replace(/^\s+/, "");
+  const max = Math.min(left.length, right.length);
+  for (let length = max; length > 0; length -= 1) {
+    if (left.slice(-length) === right.slice(0, length)) {
+      return {
+        overlapLength: length,
+        leftText: left,
+        rightText: right
+      };
+    }
+  }
+  return {
+    overlapLength: 0,
+    leftText: left,
+    rightText: right
+  };
+}
+
+function mergeDedupedResultSegments(segments: string[]) {
+  let merged = "";
+  for (const segment of segments) {
+    const current = stripPendingPrefix(String(segment ?? "")).trim();
+    if (!current) continue;
+    if (!merged) {
+      merged = current;
+      continue;
+    }
+    if (merged.includes(current)) {
+      continue;
+    }
+    if (current.includes(merged)) {
+      merged = current;
+      continue;
+    }
+    const { overlapLength, leftText, rightText } = findSuffixPrefixOverlap(
+      merged,
+      current
+    );
+    merged =
+      overlapLength > 0
+        ? `${leftText}${rightText.slice(overlapLength)}`
+        : `${leftText}\n\n${rightText}`;
+  }
+  return merged.trim();
+}
+
+function buildCourseOutlineSaveResultContent(messages: Message[], targetMessageId: number) {
+  const targetIndex = messages.findIndex((item) => item.id === targetMessageId);
+  if (targetIndex === -1) return "";
+  const segments: string[] = [];
+  for (let index = targetIndex; index >= 0; index -= 1) {
+    const item = messages[index];
+    if (item.role === "assistant") {
+      segments.unshift(item.content);
+      continue;
+    }
+    if (item.role === "user" && isExplicitContinuationCommand(item.content)) {
+      continue;
+    }
+    if (item.role === "user") {
+      break;
+    }
+  }
+  return mergeDedupedResultSegments(segments);
 }
 
 function normalizeMessagesForDisplay(
@@ -2959,7 +3036,11 @@ export default function ChatApp(props: Props) {
         currentAgent.slug,
         currentAgent.name
       );
-      const normalizedContent = stripPendingPrefix(message.content);
+      const normalizedContent =
+        isCourseOutlineMultiMethodologyAgent(currentAgent) &&
+        message.role === "assistant"
+          ? buildCourseOutlineSaveResultContent(messages, message.id)
+          : stripPendingPrefix(message.content);
       const resultContent =
         currentAgent.slug === "product-one-pager" ||
         currentAgent.slug === "product-one-pager-series" ||
@@ -2968,7 +3049,7 @@ export default function ChatApp(props: Props) {
           : normalizedContent;
       await openSaveDialogWithContent(agentDisplayName, resultContent);
     },
-    [currentAgent, openSaveDialogWithContent, resolveAgentDisplayName]
+    [currentAgent, messages, openSaveDialogWithContent, resolveAgentDisplayName]
   );
 
   const handleOpenReferenceData = useCallback(async () => {
