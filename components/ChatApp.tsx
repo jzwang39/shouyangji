@@ -1014,6 +1014,22 @@ function isRevisionIntent(input: string) {
   return patterns.some((pattern) => pattern.test(text));
 }
 
+function isExplicitContinuationCommand(input: string) {
+  const normalized = String(input ?? "")
+    .trim()
+    .replace(/[\s，,。.!！？?、；;：:“”"'‘’（）()【】\[\]]+/g, "");
+  if (!normalized) return false;
+  return (
+    normalized === "继续" ||
+    normalized === "执行完" ||
+    normalized === "执行" ||
+    normalized === "继续输出" ||
+    normalized === "继续生成" ||
+    normalized === "接着写" ||
+    normalized === "接着输出"
+  );
+}
+
 function isLikelyFullInitialInput(input: string) {
   const text = input.trim();
   if (!text) return false;
@@ -2294,6 +2310,9 @@ export default function ChatApp(props: Props) {
     }
     const content = currentInput;
     const trimmedContent = content.trim();
+    const isCourseOutlineContinueCommand =
+      isCourseOutlineAgent(currentAgent) &&
+      isExplicitContinuationCommand(trimmedContent);
     const lastAssistant = [...messages]
       .reverse()
       .find((message) => {
@@ -2311,6 +2330,7 @@ export default function ChatApp(props: Props) {
       !isExperimentDesignAgent(currentAgent)
     ) {
       const shouldUseRevisionMode =
+        !isCourseOutlineContinueCommand &&
         !!lastAssistant &&
         (isRevisionIntent(trimmedContent) ||
           !isLikelyFullInitialInput(trimmedContent));

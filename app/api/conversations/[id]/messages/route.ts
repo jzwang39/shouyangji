@@ -153,6 +153,28 @@ function isRevisionEnabledAgent(slug: string, agentName: string) {
   );
 }
 
+function isCourseOutlineConversation(slug: string, agentName: string) {
+  const normalizedSlug = normalizeAgentSlug(slug);
+  if (normalizedSlug === "course-outline") return true;
+  return String(agentName ?? "").trim() === "课纲助手「多方法论」";
+}
+
+function isExplicitContinuationCommand(content: string) {
+  const normalized = String(content ?? "")
+    .trim()
+    .replace(/[\s，,。.!！？?、；;：:“”"'‘’（）()【】\[\]]+/g, "");
+  if (!normalized) return false;
+  return (
+    normalized === "继续" ||
+    normalized === "执行完" ||
+    normalized === "执行" ||
+    normalized === "继续输出" ||
+    normalized === "继续生成" ||
+    normalized === "接着写" ||
+    normalized === "接着输出"
+  );
+}
+
 export async function GET(_request: Request, context: Params) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -303,6 +325,12 @@ ${content}`;
     if (isAiAgent(conversation.slug, conversation.agent_name)) {
       console.log(`[API] 处理AI智能体消息，slug: ${conversation.slug}, agent_name: ${conversation.agent_name}`);
       const normalizedConversationSlug = normalizeAgentSlug(conversation.slug);
+      const isCourseOutlineMultiConversation = isCourseOutlineConversation(
+        conversation.slug,
+        conversation.agent_name
+      );
+      const isCourseOutlineContinuationRequest =
+        isCourseOutlineMultiConversation && isExplicitContinuationCommand(content);
       const isMaterialCaptureConversation = isMaterialCaptureAgent(
         conversation.slug,
         conversation.agent_name
@@ -311,6 +339,7 @@ ${content}`;
         normalizedConversationSlug === "experiment-design-assistant" ||
         String(conversation.agent_name ?? "").includes("实验设计");
       const promptOverride =
+        !isCourseOutlineContinuationRequest &&
         isRevisionEnabledAgent(conversation.slug, conversation.agent_name) &&
         !isMaterialCaptureConversation &&
         !isExperimentDesignConversation &&
@@ -344,6 +373,94 @@ ${content}`
       let aiMessages:
         | Array<{ role: "system" | "user" | "assistant"; content: string }>
         | undefined;
+
+      if (isCourseOutlineContinuationRequest) {
+        const historyRows = await query<{
+          id: number;
+          role: "user" | "assistant" | "system";
+          content: string;
+        }>(
+          "SELECT id, role, content FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC",
+          [conversationId]
+        );
+        const historyMessages = historyRows
+          .map((row) => {
+            if (
+              row.role !== "system" &&
+              row.role !== "user" &&
+              row.role !== "assistant"
+            ) {
+              return null;
+            }
+            let normalizedContent = String(row.content ?? "");
+            if (row.role === "assistant" && normalizedContent.startsWith(PENDING_PREFIX)) {
+              normalizedContent = normalizedContent
+                .slice(PENDING_PREFIX.length)
+                .replace(/^\s+/, "");
+            }
+            const trimmed = normalizedContent.trim();
+            if (!trimmed) return null;
+            return {
+              id: row.id,
+              role: row.role,
+              content: trimmed
+            };
+          })
+          .filter(
+            (
+              item
+            ): item is {
+              id: number;
+              role: "system" | "user" | "assistant";
+              content: string;
+            } => !!item
+          );
+        const previousMessages = historyMessages.filter((item) => item.id !== messageId);
+        let lastAssistantIndex = -1;
+        for (let i = previousMessages.length - 1; i >= 0; i -= 1) {
+          if (previousMessages[i].role === "assistant") {
+            lastAssistantIndex = i;
+            break;
+          }
+        }
+        if (lastAssistantIndex !== -1) {
+          let baseUserIndex = -1;
+          for (let i = lastAssistantIndex - 1; i >= 0; i -= 1) {
+            if (
+              previousMessages[i].role === "user" &&
+              !isExplicitContinuationCommand(previousMessages[i].content)
+            ) {
+              baseUserIndex = i;
+              break;
+            }
+          }
+          const baseUserContent =
+            baseUserIndex !== -1 ? previousMessages[baseUserIndex].content : "";
+          const assistantContext = previousMessages
+            .slice(baseUserIndex === -1 ? 0 : baseUserIndex + 1)
+            .filter((item) => item.role === "assistant")
+            .map((item) => item.content)
+            .join("\n\n")
+            .trim();
+          if (assistantContext) {
+            const basePromptSeed = baseUserContent || promptContent;
+            const basePrompt = await buildPromptForAgent(
+              conversation.slug,
+              basePromptSeed
+            );
+            prompt = basePrompt;
+            aiMessages = [
+              { role: "user", content: basePrompt },
+              { role: "assistant", content: assistantContext },
+              {
+                role: "user",
+                content:
+                  "你上一次的输出被截断了。请严格从上文结尾处继续输出剩余内容，不要重复已经输出过的任何内容，保持原有结构、阶段顺序、节次顺序和标题层级，直到完整结束。"
+              }
+            ];
+          }
+        }
+      }
 
       if (
         normalizedConversationSlug === "product-one-pager" ||
