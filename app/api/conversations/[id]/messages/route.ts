@@ -159,6 +159,12 @@ function isCourseOutlineConversation(slug: string, agentName: string) {
   return String(agentName ?? "").trim() === "课纲助手「多方法论」";
 }
 
+function isCourseTranscriptConversation(slug: string, agentName: string) {
+  const normalizedSlug = normalizeAgentSlug(slug);
+  if (normalizedSlug === "course-transcript") return true;
+  return String(agentName ?? "").trim() === "课程逐字稿「多方法论」";
+}
+
 function isExplicitContinuationCommand(content: string) {
   const normalized = String(content ?? "")
     .trim()
@@ -329,8 +335,14 @@ ${content}`;
         conversation.slug,
         conversation.agent_name
       );
+      const isCourseTranscriptMultiConversation = isCourseTranscriptConversation(
+        conversation.slug,
+        conversation.agent_name
+      );
       const isCourseOutlineContinuationRequest =
         isCourseOutlineMultiConversation && isExplicitContinuationCommand(content);
+      const isCourseTranscriptContinuationRequest =
+        isCourseTranscriptMultiConversation && isExplicitContinuationCommand(content);
       const isMaterialCaptureConversation = isMaterialCaptureAgent(
         conversation.slug,
         conversation.agent_name
@@ -340,6 +352,7 @@ ${content}`;
         String(conversation.agent_name ?? "").includes("实验设计");
       const promptOverride =
         !isCourseOutlineContinuationRequest &&
+        !isCourseTranscriptContinuationRequest &&
         isRevisionEnabledAgent(conversation.slug, conversation.agent_name) &&
         !isMaterialCaptureConversation &&
         !isExperimentDesignConversation &&
@@ -374,7 +387,7 @@ ${content}`
         | Array<{ role: "system" | "user" | "assistant"; content: string }>
         | undefined;
 
-      if (isCourseOutlineContinuationRequest) {
+      if (isCourseOutlineContinuationRequest || isCourseTranscriptContinuationRequest) {
         const historyRows = await query<{
           id: number;
           role: "user" | "assistant" | "system";
@@ -455,7 +468,9 @@ ${content}`
               {
                 role: "user",
                 content:
-                  "你上一次的输出被截断了。请严格从上文结尾处继续输出剩余内容，不要重复已经输出过的任何内容，保持原有结构、阶段顺序、节次顺序和标题层级，直到完整结束。"
+                  isCourseTranscriptContinuationRequest
+                    ? "你上一次的逐字稿输出被截断了。请严格从上文结尾处继续输出剩余内容，不要重复已经输出过的任何内容，保持原有课程标题、讲稿结构、段落顺序和话术风格，直到完整结束。"
+                    : "你上一次的输出被截断了。请严格从上文结尾处继续输出剩余内容，不要重复已经输出过的任何内容，保持原有结构、阶段顺序、节次顺序和标题层级，直到完整结束。"
               }
             ];
           }

@@ -722,6 +722,19 @@ function isCourseTranscriptAgent(agent: Agent | null | undefined) {
   return name.includes("课程逐字稿") || name.includes("逐字稿");
 }
 
+function isCourseTranscriptMultiMethodologyAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "course-transcript" ||
+    slug === "coursetranscript" ||
+    slug === "course_transcript"
+  ) {
+    return true;
+  }
+  return String(agent.name ?? "").trim() === COURSE_TRANSCRIPT_AGENT_NAME;
+}
+
 function isCourseTranscriptSingleMethodologyAgent(
   agent: Agent | null | undefined
 ) {
@@ -2390,6 +2403,9 @@ export default function ChatApp(props: Props) {
     const isCourseOutlineContinueCommand =
       isCourseOutlineAgent(currentAgent) &&
       isExplicitContinuationCommand(trimmedContent);
+    const isCourseTranscriptContinueCommand =
+      isCourseTranscriptMultiMethodologyAgent(currentAgent) &&
+      isExplicitContinuationCommand(trimmedContent);
     const lastAssistant = [...messages]
       .reverse()
       .find((message) => {
@@ -2408,6 +2424,7 @@ export default function ChatApp(props: Props) {
     ) {
       const shouldUseRevisionMode =
         !isCourseOutlineContinueCommand &&
+        !isCourseTranscriptContinueCommand &&
         !!lastAssistant &&
         (isRevisionIntent(trimmedContent) ||
           !isLikelyFullInitialInput(trimmedContent));
