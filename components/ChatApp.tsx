@@ -974,6 +974,24 @@ function buildCourseOutlineSaveResultContent(messages: Message[], targetMessageI
   return mergeDedupedResultSegments(segments);
 }
 
+function stripWrappingCodeFence(text: string) {
+  let normalized = String(text ?? "");
+  normalized = normalized.replace(/^\s*```(?:[a-zA-Z0-9_-]+)?\s*\n?/, "");
+  normalized = normalized.replace(/\n?```\s*$/, "");
+  return normalized;
+}
+
+function getRenderedAssistantContent(
+  content: string,
+  agent: Agent | null | undefined
+) {
+  const stripped = stripPendingPrefix(content);
+  if (isCourseOutlineAgent(agent) || isCourseTranscriptAgent(agent)) {
+    return stripWrappingCodeFence(stripped);
+  }
+  return stripped;
+}
+
 function normalizeMessagesForDisplay(
   messages: Message[],
   agent: Agent | null | undefined
@@ -1067,6 +1085,25 @@ function getCourseOutlineLessonSection(text: string, lessonIndex: number) {
     return source.slice(start, end).trim();
   }
   return "";
+}
+
+function getCourseOutlineFourThingsNineGridMapping(text: string) {
+  const source = String(text ?? "");
+  if (!source.trim()) return "";
+  const headingRegex =
+    /^\s*(?:#{1,6}\s*)?(?:【[^】]*】\s*)?四件事\s*(?:与|和|×|x|\*)\s*九宫格(?:模块)?对应关系.*$/gim;
+  const headingMatch = headingRegex.exec(source);
+  if (!headingMatch) return "";
+  const start = headingMatch.index ?? 0;
+  const rest = source.slice(start);
+  const nextSectionMatch = rest
+    .slice(headingMatch[0].length)
+    .match(/\n(?=\s*(?:---|#{1,6}\s))/m);
+  const end =
+    nextSectionMatch && typeof nextSectionMatch.index === "number"
+      ? start + headingMatch[0].length + nextSectionMatch.index
+      : source.length;
+  return source.slice(start, end).trim();
 }
 
 function extractProductOnePagerSaveContent(text: string) {
@@ -1505,13 +1542,9 @@ export default function ChatApp(props: Props) {
     if (!referenceForm.currentLesson) {
       return "";
     }
-    const text = referenceForm.courseOutlineContent;
-    const regex = /^## .*四件事与九宫格对应关系[\s\S]*?(?=^---|\Z)/m;
-    const match = text.match(regex);
-    if (match && match[0]) {
-      return match[0].trim();
-    }
-    return "";
+    return getCourseOutlineFourThingsNineGridMapping(
+      referenceForm.courseOutlineContent
+    );
   }, [currentAgent, referenceForm?.courseOutlineContent, referenceForm?.currentLesson]);
 
   useEffect(() => {
@@ -4515,7 +4548,7 @@ export default function ChatApp(props: Props) {
                     const displayedContent =
                       message.role === "assistant" &&
                       typeof message.content === "string"
-                        ? stripPendingPrefix(message.content)
+                        ? getRenderedAssistantContent(message.content, currentAgent)
                         : message.content;
                     return (
                       <div
