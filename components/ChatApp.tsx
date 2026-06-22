@@ -1091,14 +1091,16 @@ function getCourseOutlineFourThingsNineGridMapping(text: string) {
   const source = String(text ?? "");
   if (!source.trim()) return "";
   const headingRegex =
-    /^\s*(?:#{1,6}\s*)?(?:【[^】]*】\s*)?四件事\s*(?:与|和|×|x|\*)\s*九宫格(?:模块)?对应关系.*$/gim;
+    /^\s*(?:#{1,6}\s*)?(?:【[^】]*】\s*)?(?:(?:\d+|[一二三四五六七八九十]+)\s*[、.．]\s*)?四件事\s*(?:与|和|×|x|\*)\s*九宫格(?:模块)?对应关系.*$/gim;
   const headingMatch = headingRegex.exec(source);
   if (!headingMatch) return "";
   const start = headingMatch.index ?? 0;
   const rest = source.slice(start);
   const nextSectionMatch = rest
     .slice(headingMatch[0].length)
-    .match(/\n(?=\s*(?:---|#{1,6}\s))/m);
+    .match(
+      /\n(?=\s*(?:---|#{1,6}\s|(?:\d+|[一二三四五六七八九十]+)\s*[、.．]\s*(?!四件事\s*(?:与|和|×|x|\*)\s*九宫格)))/m
+    );
   const end =
     nextSectionMatch && typeof nextSectionMatch.index === "number"
       ? start + headingMatch[0].length + nextSectionMatch.index
