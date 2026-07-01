@@ -49,7 +49,7 @@ export default function HomePageClient({ user }: Props) {
               登出
             </button>
             <Link
-              href="/chat"
+              href="/home"
               className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90"
             >
               进入应用
@@ -79,7 +79,7 @@ export default function HomePageClient({ user }: Props) {
             <div className="mt-8 flex flex-wrap items-center gap-3">
               {user ? (
                 <Link
-                  href="/chat"
+                  href="/home"
                   className="btn-primary inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold shadow-sm"
                 >
                   进入应用

@@ -6,7 +6,7 @@ import LoginForm from "@/components/LoginForm";
 export default async function LoginPage() {
   const session = await getServerSession(authOptions);
   if (session) {
-    redirect("/chat");
+    redirect("/home");
   }
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -17,4 +17,3 @@ export default async function LoginPage() {
     </div>
   );
 }
-

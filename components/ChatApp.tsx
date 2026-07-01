@@ -83,6 +83,9 @@ type Props = {
   agents: Agent[];
   allowedMenuKeys: string[];
   initialConversations: Conversation[];
+  initialActivePanel?: ActivePanel;
+  initialSelectedAgentId?: number | null;
+  initialStartNewConversation?: boolean;
 };
 
 const PRODUCT_ONE_PAGER_AGENT_NAME = "产品一页纸「单一产品」";
@@ -241,6 +244,192 @@ function AgentMenuIcon({ slug }: { slug: string }) {
         <path d="M2 12h4" />
         <path d="M18 12h4" />
         <path d="M12 12l4-2" />
+      </svg>
+    );
+  }
+  if (slug === "trust-blueprint") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="M9 12l2 2 4-4" />
+      </svg>
+    );
+  }
+  if (slug === "trust-persona") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4z" />
+        <path d="M6 20a6 6 0 0 1 12 0" />
+        <path d="M19 8l1 1 2-2" />
+      </svg>
+    );
+  }
+  if (slug === "trust-warning") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      </svg>
+    );
+  }
+  if (slug === "trust-decrypt") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9 12h6" />
+        <path d="M12 9v6" />
+        <path d="M16.5 7.5 19 5" />
+      </svg>
+    );
+  }
+  if (slug === "trust-product") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <rect x="4" y="6" width="16" height="12" rx="2" />
+        <path d="M9 10h6" />
+        <path d="M9 14h4" />
+        <path d="M8 6V4h8v2" />
+      </svg>
+    );
+  }
+  if (slug === "trust-barrier") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 3 5 6v6c0 5 3.5 8.5 7 9 3.5-.5 7-4 7-9V6l-7-3z" />
+        <path d="M9 12h6" />
+        <path d="M12 9v6" />
+      </svg>
+    );
+  }
+  if (slug === "trust-negotiation") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M8 14l-4-4 4-4" />
+        <path d="M16 10l4 4-4 4" />
+        <path d="M9 10h6" />
+        <path d="M9 14h6" />
+      </svg>
+    );
+  }
+  if (slug === "trust-transaction") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M4 7h16" />
+        <path d="M7 4v6" />
+        <path d="M17 4v6" />
+        <rect x="4" y="7" width="16" height="13" rx="2" />
+        <path d="M9 14h6" />
+      </svg>
+    );
+  }
+  if (slug === "article-clone") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M14 4h6v6" />
+        <path d="M10 20H4v-6" />
+        <path d="M20 4 9 15" />
+        <path d="m14 20 6-6" />
+        <path d="M4 10 10 4" />
+      </svg>
+    );
+  }
+  if (slug === "new-chat-agent") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <path d="M8 9h8" />
+        <path d="M8 13h5" />
       </svg>
     );
   }
@@ -618,9 +807,18 @@ function isRevisionEnabledAgent(agent: Agent | null | undefined) {
 }
 
 function normalizeAgentSlug(slug: string | null | undefined) {
-  return String(slug ?? "")
+  const normalized = String(slug ?? "")
     .trim()
     .toLowerCase();
+  if (
+    normalized === "newchatagent" ||
+    normalized === "new_chat_agent" ||
+    normalized === "newchat" ||
+    normalized === "new_chat"
+  ) {
+    return "new-chat-agent";
+  }
+  return normalized;
 }
 
 function isPositioningAgent(agent: Agent | null | undefined) {
@@ -635,6 +833,110 @@ function isPositioningAgent(agent: Agent | null | undefined) {
     return true;
   }
   return String(agent.name ?? "").includes("定位");
+}
+
+function isTrustBlueprintAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "trust-blueprint" ||
+    slug === "trustblueprint" ||
+    slug === "trust_blueprint"
+  ) {
+    return true;
+  }
+  return String(agent.name ?? "").includes("信任蓝图");
+}
+
+function isTrustPersonaAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "trust-persona" ||
+    slug === "trustpersona" ||
+    slug === "trust_persona"
+  ) {
+    return true;
+  }
+  return String(agent.name ?? "").includes("信任人设");
+}
+
+function isTrustWarningAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "trust-warning" ||
+    slug === "trustwarning" ||
+    slug === "trust_warning"
+  ) {
+    return true;
+  }
+  return String(agent.name ?? "").includes("信任警醒");
+}
+
+function isTrustDecryptAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "trust-decrypt" ||
+    slug === "trustdecrypt" ||
+    slug === "trust_decrypt"
+  ) {
+    return true;
+  }
+  return String(agent.name ?? "").includes("信任解密");
+}
+
+function isTrustProductAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "trust-product" ||
+    slug === "trustproduct" ||
+    slug === "trust_product"
+  ) {
+    return true;
+  }
+  return String(agent.name ?? "").includes("信任产品");
+}
+
+function isTrustBarrierAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "trust-barrier" ||
+    slug === "trustbarrier" ||
+    slug === "trust_barrier"
+  ) {
+    return true;
+  }
+  return String(agent.name ?? "").includes("信任壁垒");
+}
+
+function isTrustNegotiationAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "trust-negotiation" ||
+    slug === "trustnegotiation" ||
+    slug === "trust_negotiation"
+  ) {
+    return true;
+  }
+  return String(agent.name ?? "").includes("信任谈判");
+}
+
+function isTrustTransactionAgent(agent: Agent | null | undefined) {
+  if (!agent) return false;
+  const slug = normalizeAgentSlug(agent.slug);
+  if (
+    slug === "trust-transaction" ||
+    slug === "trusttransaction" ||
+    slug === "trust_transaction"
+  ) {
+    return true;
+  }
+  return String(agent.name ?? "").includes("信任成交");
 }
 
 function isFourThingsAgent(agent: Agent | null | undefined) {
@@ -1217,7 +1519,15 @@ ${lastPrompt || "（提示词缺失）"}`;
 
 export default function ChatApp(props: Props) {
   // Update timestamp: 2026-03-05 17:35
-  const { user, agents, allowedMenuKeys, initialConversations } = props;
+  const {
+    user,
+    agents,
+    allowedMenuKeys,
+    initialConversations,
+    initialActivePanel = "chat",
+    initialSelectedAgentId = null,
+    initialStartNewConversation = false
+  } = props;
 
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const lastAssistantContentRef = useRef<HTMLDivElement | null>(null);
@@ -1233,15 +1543,21 @@ export default function ChatApp(props: Props) {
 
   const [conversations, setConversations] =
     useState<Conversation[]>(initialConversations);
-  const [activePanel, setActivePanel] = useState<ActivePanel>("chat");
+  const [activePanel, setActivePanel] = useState<ActivePanel>(initialActivePanel);
   const [currentConversationId, setCurrentConversationId] = useState<
     number | null
-  >(conversations[0]?.id ?? null);
+  >(
+    initialActivePanel === "chat"
+      ? initialStartNewConversation
+        ? VIRTUAL_CONVERSATION_ID
+        : conversations[0]?.id ?? null
+      : null
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [currentInput, setCurrentInput] = useState("");
   const [currentAgentId, setCurrentAgentId] = useState(
-    agents[0]?.id ?? null
+    initialSelectedAgentId ?? agents[0]?.id ?? null
   );
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [messagesReloadKey, setMessagesReloadKey] = useState(0);
@@ -1402,7 +1718,6 @@ export default function ChatApp(props: Props) {
     () => conversations.find((c) => c.id === currentConversationId) ?? null,
     [conversations, currentConversationId]
   );
-
   const selectedAgentId = useMemo(
     () => currentConversation?.agent_id ?? currentAgentId,
     [currentConversation, currentAgentId]
@@ -2015,6 +2330,11 @@ export default function ChatApp(props: Props) {
     loadManagedResults
   ]);
 
+  const handleOpenHome = useCallback(() => {
+    void cleanupCurrentConversationIfEmpty();
+    window.location.href = "/home";
+  }, [cleanupCurrentConversationIfEmpty]);
+
   const handleOpenOutlineExtraction = useCallback(() => {
     if (!canAccessOutlineExtraction) return;
     void cleanupCurrentConversationIfEmpty();
@@ -2455,7 +2775,15 @@ export default function ChatApp(props: Props) {
     if (
       isRevisionEnabledAgent(currentAgent) &&
       !isAnyMaterialCaptureAgent(currentAgent) &&
-      !isExperimentDesignAgent(currentAgent)
+      !isExperimentDesignAgent(currentAgent) &&
+      !isTrustBlueprintAgent(currentAgent) &&
+      !isTrustPersonaAgent(currentAgent) &&
+      !isTrustWarningAgent(currentAgent) &&
+      !isTrustDecryptAgent(currentAgent) &&
+      !isTrustProductAgent(currentAgent) &&
+      !isTrustBarrierAgent(currentAgent) &&
+      !isTrustNegotiationAgent(currentAgent) &&
+      !isTrustTransactionAgent(currentAgent)
     ) {
       const shouldUseRevisionMode =
         !isCourseOutlineContinueCommand &&
@@ -3046,36 +3374,38 @@ export default function ChatApp(props: Props) {
 
   const resolveAgentDisplayName = useCallback(
     (slug: string, fallback: string) => {
-      if (slug === "product-one-pager") return PRODUCT_ONE_PAGER_AGENT_NAME;
-      if (slug === "product-one-pager-series") {
+      const normalizedSlug = normalizeAgentSlug(slug);
+      if (normalizedSlug === "new-chat-agent") return "新对话";
+      if (normalizedSlug === "product-one-pager") return PRODUCT_ONE_PAGER_AGENT_NAME;
+      if (normalizedSlug === "product-one-pager-series") {
         return PRODUCT_ONE_PAGER_SERIES_AGENT_NAME;
       }
-      if (slug === "product-one-pager-xingyuefeng") {
+      if (normalizedSlug === "product-one-pager-xingyuefeng") {
         return PRODUCT_ONE_PAGER_XINGYUEFENG_AGENT_NAME;
       }
-      if (slug === "positioning-helper") return "定位助手「单一产品」";
-      if (slug === "four-things") return "四件事";
-      if (slug === "nine-grid") return "九宫格";
-      if (slug === "guixin-transaction") return "归心成交";
-      if (slug === "course-outline-single-methodology") {
+      if (normalizedSlug === "positioning-helper") return "定位助手「单一产品」";
+      if (normalizedSlug === "four-things") return "四件事";
+      if (normalizedSlug === "nine-grid") return "九宫格";
+      if (normalizedSlug === "guixin-transaction") return "归心成交";
+      if (normalizedSlug === "course-outline-single-methodology") {
         return COURSE_OUTLINE_SINGLE_METHODOLOGY_AGENT_NAME;
       }
-      if (slug === "course-outline-xingyuefeng") {
+      if (normalizedSlug === "course-outline-xingyuefeng") {
         return COURSE_OUTLINE_XINGYUEFENG_AGENT_NAME;
       }
-      if (slug === "course-outline") return COURSE_OUTLINE_AGENT_NAME;
-      if (slug === "course-transcript-single-methodology") {
+      if (normalizedSlug === "course-outline") return COURSE_OUTLINE_AGENT_NAME;
+      if (normalizedSlug === "course-transcript-single-methodology") {
         return COURSE_TRANSCRIPT_SINGLE_METHODOLOGY_AGENT_NAME;
       }
-      if (slug === "course-transcript-xingyuefeng") {
+      if (normalizedSlug === "course-transcript-xingyuefeng") {
         return COURSE_TRANSCRIPT_XINGYUEFENG_AGENT_NAME;
       }
-      if (slug === "course-transcript") return COURSE_TRANSCRIPT_AGENT_NAME;
-      if (slug === "material-tagging-assistant") return "素材标记";
-      if (slug === "deterministic-material-capture-assistant") return "确定性素材抓取";
-      if (slug === "crisis-material-capture-assistant") return "危机素材抓取";
-      if (slug === "science-popularization-material-capture-assistant") return "科普素材抓取";
-      if (slug === "keyword-material-capture-assistant") return "重点词素材抓取";
+      if (normalizedSlug === "course-transcript") return COURSE_TRANSCRIPT_AGENT_NAME;
+      if (normalizedSlug === "material-tagging-assistant") return "素材标记";
+      if (normalizedSlug === "deterministic-material-capture-assistant") return "确定性素材抓取";
+      if (normalizedSlug === "crisis-material-capture-assistant") return "危机素材抓取";
+      if (normalizedSlug === "science-popularization-material-capture-assistant") return "科普素材抓取";
+      if (normalizedSlug === "keyword-material-capture-assistant") return "重点词素材抓取";
       return fallback;
     },
     []
@@ -3217,17 +3547,40 @@ export default function ChatApp(props: Props) {
         style={sidebarCollapsed ? undefined : { width: sidebarWidth }}
       >
         <div className="flex flex-none items-center justify-between px-5 py-5 border-b border-sidebar-active/40">
-          <Link href="/" className="text-base font-bold tracking-wide hover:opacity-70 transition-opacity">策划大师</Link>
+          <Link href="/home" className="text-base font-bold tracking-wide hover:opacity-70 transition-opacity">策划大师</Link>
         </div>
         {!sidebarCollapsed ? (
           <div className="flex-1 overflow-y-scroll min-h-0 py-5 custom-scrollbar">
             <div className="px-5">
+              <div className="mb-3 text-[10px] font-semibold uppercase tracking-widest opacity-50">菜单</div>
+              <button
+                type="button"
+                className="mb-2 flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 hover:bg-sidebar-hover"
+                onClick={handleOpenHome}
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <svg
+                    className="h-4 w-4 shrink-0 opacity-80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 10.5 12 3l9 7.5" />
+                    <path d="M5 9.5V21h14V9.5" />
+                    <path d="M9 21v-6h6v6" />
+                  </svg>
+                  <span className="truncate">首页</span>
+                </span>
+              </button>
+              <div className="my-2 border-t border-sidebar-active/40" />
               <div className="mb-3 text-[10px] font-semibold uppercase tracking-widest opacity-50">智能体</div>
               <div className="space-y-0.5">
                 {agents.map((agent) => (
                   <div key={agent.id}>
                     {agent.slug === "product-one-pager-series" ||
-                    agent.slug === "material-tagging-assistant" ||
                     agent.slug === "experiment-design-assistant" ? (
                       <div className="my-2 border-t border-sidebar-active/40" />
                     ) : null}
@@ -3243,77 +3596,83 @@ export default function ChatApp(props: Props) {
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         <AgentMenuIcon slug={agent.slug} />
-                        <span className="truncate">{agent.name}</span>
+                        <span className="truncate">
+                          {resolveAgentDisplayName(agent.slug, agent.name)}
+                        </span>
                       </span>
                     </button>
-                    {agent.slug === "course-transcript-single-methodology" ? (
+                    {agent.slug === "new-chat-agent" ||
+                    agent.slug === "trust-transaction" ||
+                    agent.slug === "course-transcript-single-methodology" ||
+                    agent.slug === "experiment-design-assistant" ? (
                       <div className="my-2 border-t border-sidebar-active/40" />
                     ) : null}
                   </div>
                 ))}
-                {canAccessOutlineExtraction || canAccessDataManagement ? (
+                {canAccessOutlineExtraction ? (
+                  <button
+                    type="button"
+                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
+                      activePanel === "outline-extraction"
+                        ? "bg-sidebar-active font-medium"
+                        : "hover:bg-sidebar-hover"
+                    }`}
+                    onClick={handleOpenOutlineExtraction}
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <svg
+                        className="h-4 w-4 shrink-0 opacity-80"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M7 3h8l5 5v13a1 1 0 0 1-1 1H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z" />
+                        <path d="M15 3v6h6" />
+                        <path d="M8 12h8" />
+                        <path d="M8 16h6" />
+                      </svg>
+                      <span className="truncate">大纲提取</span>
+                    </span>
+                  </button>
+                ) : null}
+                {canAccessDataManagement ? (
                   <div>
                     <div className="my-2 border-t border-sidebar-active/40" />
-                    {canAccessOutlineExtraction ? (
-                      <button
-                        type="button"
-                        className={`mb-2 flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
-                          activePanel === "outline-extraction"
-                            ? "bg-sidebar-active font-medium"
-                            : "hover:bg-sidebar-hover"
-                        }`}
-                        onClick={handleOpenOutlineExtraction}
-                      >
-                        <span className="flex min-w-0 items-center gap-2.5">
-                          <svg
-                            className="h-4 w-4 shrink-0 opacity-80"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M7 3h8l5 5v13a1 1 0 0 1-1 1H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z" />
-                            <path d="M15 3v6h6" />
-                            <path d="M8 12h8" />
-                            <path d="M8 16h6" />
-                          </svg>
-                          <span className="truncate">大纲提取</span>
-                        </span>
-                      </button>
-                    ) : null}
-                    {canAccessDataManagement ? (
-                      <button
-                        type="button"
-                        className={`flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
-                          activePanel === "data-management"
-                            ? "bg-sidebar-active font-medium"
-                            : "hover:bg-sidebar-hover"
-                        }`}
-                        onClick={handleOpenDataManagement}
-                      >
-                        <span className="flex min-w-0 items-center gap-2.5">
-                          <svg
-                            className="h-4 w-4 shrink-0 opacity-80"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M4 5h16" />
-                            <path d="M4 12h16" />
-                            <path d="M4 19h16" />
-                            <path d="M8 3v4" />
-                            <path d="M16 10v4" />
-                            <path d="M12 17v4" />
-                          </svg>
-                          <span className="truncate">数据管理</span>
-                        </span>
-                      </button>
-                    ) : null}
+                    <div className="mb-3 text-[10px] font-semibold uppercase tracking-widest opacity-50">
+                      功能
+                    </div>
+                    <button
+                      type="button"
+                      className={`flex w-full items-center rounded-lg px-3 py-2.5 text-xs transition-all duration-200 ${
+                        activePanel === "data-management"
+                          ? "bg-sidebar-active font-medium"
+                          : "hover:bg-sidebar-hover"
+                      }`}
+                      onClick={handleOpenDataManagement}
+                    >
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <svg
+                          className="h-4 w-4 shrink-0 opacity-80"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 5h16" />
+                          <path d="M4 12h16" />
+                          <path d="M4 19h16" />
+                          <path d="M8 3v4" />
+                          <path d="M16 10v4" />
+                          <path d="M12 17v4" />
+                        </svg>
+                        <span className="truncate">数据管理</span>
+                      </span>
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -3374,7 +3733,9 @@ export default function ChatApp(props: Props) {
                         </div>
                       ) : (
                         <>
-                          <div className="truncate pr-2 font-medium">{conversation.title}</div>
+                        <div className="truncate pr-2 font-medium">
+                          {conversation.title}
+                        </div>
                           <span
                             className="cursor-pointer opacity-0 group-hover:opacity-40 hover:opacity-100 transition-opacity"
                             onClick={(event) => {
@@ -3507,12 +3868,37 @@ export default function ChatApp(props: Props) {
 
         {mobileSidebarOpen ? (
           <div className="flex max-h-[60vh] flex-col overflow-y-scroll border-b bg-sidebar p-3 text-sidebar-text custom-scrollbar md:hidden">
+            <div className="mb-2 text-xs opacity-60">菜单</div>
+            <div className="mb-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded bg-sidebar-hover px-2 py-1 text-xs transition-colors"
+                onClick={handleOpenHome}
+              >
+                <span className="flex items-center gap-1.5">
+                  <svg
+                    className="h-4 w-4 shrink-0 opacity-80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 10.5 12 3l9 7.5" />
+                    <path d="M5 9.5V21h14V9.5" />
+                    <path d="M9 21v-6h6v6" />
+                  </svg>
+                  <span>首页</span>
+                </span>
+              </button>
+            </div>
+            <div className="mb-3 h-px w-full bg-sidebar-active/40" />
             <div className="mb-2 text-xs opacity-60">智能体</div>
             <div className="mb-4 flex flex-wrap gap-2">
               {agents.map((agent) => (
                 <div key={agent.id} className="contents">
                   {agent.slug === "product-one-pager-series" ||
-                  agent.slug === "material-tagging-assistant" ||
                   agent.slug === "experiment-design-assistant" ? (
                     <div className="my-1 h-px w-full basis-full bg-sidebar-active/40" />
                   ) : null}
@@ -3528,47 +3914,53 @@ export default function ChatApp(props: Props) {
                   >
                     <span className="flex items-center gap-1.5">
                       <AgentMenuIcon slug={agent.slug} />
-                      <span className="truncate">{agent.name}</span>
+                      <span className="truncate">
+                        {resolveAgentDisplayName(agent.slug, agent.name)}
+                      </span>
                     </span>
                   </button>
-                  {agent.slug === "course-transcript-single-methodology" ? (
+                  {agent.slug === "new-chat-agent" ||
+                  agent.slug === "trust-transaction" ||
+                  agent.slug === "course-transcript-single-methodology" ||
+                  agent.slug === "experiment-design-assistant" ? (
                     <div className="my-1 h-px w-full basis-full bg-sidebar-active/40" />
                   ) : null}
                 </div>
               ))}
-              {canAccessOutlineExtraction || canAccessDataManagement ? (
+              {canAccessOutlineExtraction ? (
+                <button
+                  type="button"
+                  className={`rounded px-2 py-1 text-xs transition-colors ${
+                    activePanel === "outline-extraction"
+                      ? "bg-sidebar-active"
+                      : "bg-sidebar-hover"
+                  }`}
+                  onClick={handleOpenOutlineExtraction}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <svg
+                      className="h-4 w-4 shrink-0 opacity-80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M7 3h8l5 5v13a1 1 0 0 1-1 1H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z" />
+                      <path d="M15 3v6h6" />
+                      <path d="M8 12h8" />
+                      <path d="M8 16h6" />
+                    </svg>
+                    <span className="truncate">大纲提取</span>
+                  </span>
+                </button>
+              ) : null}
+              {canAccessDataManagement ? (
                 <div className="contents">
                   <div className="my-1 h-px w-full basis-full bg-sidebar-active/40" />
-                  {canAccessOutlineExtraction ? (
-                    <button
-                      type="button"
-                      className={`rounded px-2 py-1 text-xs transition-colors ${
-                        activePanel === "outline-extraction"
-                          ? "bg-sidebar-active"
-                          : "bg-sidebar-hover"
-                      }`}
-                      onClick={handleOpenOutlineExtraction}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <svg
-                          className="h-4 w-4 shrink-0 opacity-80"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M7 3h8l5 5v13a1 1 0 0 1-1 1H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z" />
-                          <path d="M15 3v6h6" />
-                          <path d="M8 12h8" />
-                          <path d="M8 16h6" />
-                        </svg>
-                        <span className="truncate">大纲提取</span>
-                      </span>
-                    </button>
-                  ) : null}
-                  {canAccessDataManagement ? (
+                  <div className="contents">
+                    <div className="w-full basis-full text-xs opacity-60">功能</div>
                     <button
                       type="button"
                       className={`rounded px-2 py-1 text-xs transition-colors ${
@@ -3598,7 +3990,7 @@ export default function ChatApp(props: Props) {
                         <span className="truncate">数据管理</span>
                       </span>
                     </button>
-                  ) : null}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -3669,7 +4061,9 @@ export default function ChatApp(props: Props) {
                       </>
                     ) : (
                       <>
-                        <div className="truncate pr-2">{conversation.title}</div>
+                        <div className="truncate pr-2">
+                          {conversation.title}
+                        </div>
                         <span
                           className="cursor-pointer opacity-40 hover:opacity-100"
                           onClick={(event) => {
@@ -3729,7 +4123,7 @@ export default function ChatApp(props: Props) {
                 </div>
               ) : currentAgent ? (
                 <div className="mt-0.5 text-xs text-sidebar-text opacity-50">
-                  当前智能体：{currentAgent.name}
+                  当前智能体：{resolveAgentDisplayName(currentAgent.slug, currentAgent.name)}
                 </div>
               ) : null}
             </div>

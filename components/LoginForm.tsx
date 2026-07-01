@@ -22,7 +22,7 @@ export default function LoginForm() {
     if (result?.error) {
       setError("登录失败，请检查用户名和密码");
     } else {
-      window.location.href = "/chat";
+      window.location.href = "/home";
     }
   };
 

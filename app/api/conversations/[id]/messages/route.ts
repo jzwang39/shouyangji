@@ -20,6 +20,16 @@ const AI_AGENT_SLUGS = new Set([
   "positioning-assistant",
   "position-helper",
   "product-one-pager",
+  "new-chat-agent",
+  "trust-blueprint",
+  "trust-persona",
+  "trust-warning",
+  "trust-decrypt",
+  "trust-product",
+  "trust-barrier",
+  "trust-negotiation",
+  "trust-transaction",
+  "article-clone",
   "product-one-pager-series",
   "product-one-pager-xingyuefeng",
   "four-things",
@@ -79,6 +89,47 @@ function normalizeAgentSlug(slug: string) {
   ) {
     return "keyword-material-capture-assistant";
   }
+  if (normalized === "trustblueprint" || normalized === "trust_blueprint") {
+    return "trust-blueprint";
+  }
+  if (normalized === "trustpersona" || normalized === "trust_persona") {
+    return "trust-persona";
+  }
+  if (normalized === "trustwarning" || normalized === "trust_warning") {
+    return "trust-warning";
+  }
+  if (normalized === "trustdecrypt" || normalized === "trust_decrypt") {
+    return "trust-decrypt";
+  }
+  if (normalized === "trustproduct" || normalized === "trust_product") {
+    return "trust-product";
+  }
+  if (normalized === "trustbarrier" || normalized === "trust_barrier") {
+    return "trust-barrier";
+  }
+  if (
+    normalized === "trustnegotiation" ||
+    normalized === "trust_negotiation"
+  ) {
+    return "trust-negotiation";
+  }
+  if (
+    normalized === "trusttransaction" ||
+    normalized === "trust_transaction"
+  ) {
+    return "trust-transaction";
+  }
+  if (normalized === "articleclone" || normalized === "article_clone") {
+    return "article-clone";
+  }
+  if (
+    normalized === "newchatagent" ||
+    normalized === "new_chat_agent" ||
+    normalized === "newchat" ||
+    normalized === "new_chat"
+  ) {
+    return "new-chat-agent";
+  }
   return normalized;
 }
 
@@ -108,6 +159,16 @@ function isAiAgent(slug: string, agentName: string) {
   if (!name) return false;
   return (
     name.includes("产品一页纸") ||
+    name.includes("信任蓝图") ||
+    name.includes("信任人设") ||
+    name.includes("信任警醒") ||
+    name.includes("信任解密") ||
+    name.includes("信任产品") ||
+    name.includes("信任壁垒") ||
+    name.includes("信任谈判") ||
+    name.includes("信任成交") ||
+    name.includes("文章克隆") ||
+    name.includes("新对话") ||
     name.includes("定位") ||
     name.includes("四件事") ||
     name.includes("九宫格") ||
@@ -238,7 +299,6 @@ export async function POST(request: Request, context: Params) {
       slug: string;
       agent_name: string;
     };
-
     const result: any = await query(
       "INSERT INTO messages (conversation_id, role, content) VALUES (?, 'user', ?)",
       [conversationId, content]
@@ -350,12 +410,30 @@ ${content}`;
       const isExperimentDesignConversation =
         normalizedConversationSlug === "experiment-design-assistant" ||
         String(conversation.agent_name ?? "").includes("实验设计");
+      const isTrustContextConversation =
+        normalizedConversationSlug === "trust-blueprint" ||
+        normalizedConversationSlug === "trust-persona" ||
+        normalizedConversationSlug === "trust-warning" ||
+        normalizedConversationSlug === "trust-decrypt" ||
+        normalizedConversationSlug === "trust-product" ||
+        normalizedConversationSlug === "trust-barrier" ||
+        normalizedConversationSlug === "trust-negotiation" ||
+        normalizedConversationSlug === "trust-transaction" ||
+        String(conversation.agent_name ?? "").includes("信任蓝图") ||
+        String(conversation.agent_name ?? "").includes("信任人设") ||
+        String(conversation.agent_name ?? "").includes("信任警醒") ||
+        String(conversation.agent_name ?? "").includes("信任解密") ||
+        String(conversation.agent_name ?? "").includes("信任产品") ||
+        String(conversation.agent_name ?? "").includes("信任壁垒") ||
+        String(conversation.agent_name ?? "").includes("信任谈判") ||
+        String(conversation.agent_name ?? "").includes("信任成交");
       const promptOverride =
         !isCourseOutlineContinuationRequest &&
         !isCourseTranscriptContinuationRequest &&
         isRevisionEnabledAgent(conversation.slug, conversation.agent_name) &&
         !isMaterialCaptureConversation &&
         !isExperimentDesignConversation &&
+        !isTrustContextConversation &&
         rawPromptOverride
           ? rawPromptOverride
           : "";
@@ -479,10 +557,21 @@ ${content}`
 
       if (
         normalizedConversationSlug === "product-one-pager" ||
+        normalizedConversationSlug === "new-chat-agent" ||
+        normalizedConversationSlug === "trust-blueprint" ||
+        normalizedConversationSlug === "trust-persona" ||
+        normalizedConversationSlug === "trust-warning" ||
+        normalizedConversationSlug === "trust-decrypt" ||
+        normalizedConversationSlug === "trust-product" ||
+        normalizedConversationSlug === "trust-barrier" ||
+        normalizedConversationSlug === "trust-negotiation" ||
+        normalizedConversationSlug === "trust-transaction" ||
+        normalizedConversationSlug === "article-clone" ||
         normalizedConversationSlug === "product-one-pager-series" ||
         normalizedConversationSlug === "product-one-pager-xingyuefeng" ||
         isMaterialTaggingConversation ||
-        isExperimentDesignConversation
+        isExperimentDesignConversation ||
+        isTrustContextConversation
       ) {
         const historyRows = await query<{
           id: number;

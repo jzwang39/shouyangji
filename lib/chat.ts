@@ -35,6 +35,7 @@ export const SPECIAL_MENU_ITEMS: Array<{
 const HIDDEN_CHAT_MENU_SLUGS = new Set(["guixin-transaction"]);
 
 const DISPLAY_ORDER = [
+  "new-chat-agent",
   "product-one-pager",
   "positioning-helper",
   "four-things",
@@ -42,18 +43,27 @@ const DISPLAY_ORDER = [
   "guixin-transaction",
   "course-outline",
   "course-transcript",
+  "material-tagging-assistant",
+  "deterministic-material-capture-assistant",
+  "crisis-material-capture-assistant",
+  "science-popularization-material-capture-assistant",
+  "keyword-material-capture-assistant",
   "product-one-pager-series",
   "course-outline-single-methodology",
   "course-transcript-single-methodology",
   "product-one-pager-xingyuefeng",
   "course-outline-xingyuefeng",
   "course-transcript-xingyuefeng",
-  "material-tagging-assistant",
-  "deterministic-material-capture-assistant",
-  "crisis-material-capture-assistant",
-  "science-popularization-material-capture-assistant",
-  "keyword-material-capture-assistant",
-  "experiment-design-assistant"
+  "experiment-design-assistant",
+  "trust-blueprint",
+  "trust-persona",
+  "trust-warning",
+  "trust-decrypt",
+  "trust-product",
+  "trust-barrier",
+  "trust-negotiation",
+  "trust-transaction",
+  "article-clone"
 ];
 
 function sortAgentsByDisplayOrder(agents: Agent[]) {
